@@ -1,0 +1,159 @@
+---
+title: "Browser check"
+subtitle: "Can this browser run every model the tutorial needs?"
+format:
+  live-html:
+    webr:
+      cell-options:
+        autorun: true
+        timelimit: 0
+engine: knitr
+resources:
+  - data
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+This page runs R inside your browser and works through the same steps the tutorial will use: installing packages, reading the data, and fitting a paired t-test, a linear mixed model and an ordinal mixed model. Everything starts on its own.
+
+::: {.callout-note}
+## The first visit is slow
+
+Your browser downloads R and each package the first time, which can take a minute or two. Keep this tab open until the **Summary** at the bottom shows numbers. Later visits are faster because the browser caches the downloads.
+:::
+
+## 1. R is running
+
+```{webr}
+#| caption: R version
+R.version.string
+```
+
+## 2. Install the packages
+
+Each package is downloaded from the webR package repository. `available` should be `TRUE` for every row.
+
+```{webr}
+#| caption: Install and load packages
+pkgs <- c("lme4", "lmerTest", "pbkrtest", "ordinal", "emmeans", "ggplot2")
+
+pkg_status <- do.call(rbind, lapply(pkgs, function(p) {
+  secs <- system.time(
+    ok <- tryCatch({
+      install.packages(p, quiet = TRUE)
+      requireNamespace(p, quietly = TRUE)
+    }, error = function(e) FALSE)
+  )[["elapsed"]]
+  data.frame(
+    package   = p,
+    available = ok,
+    version   = if (ok) as.character(packageVersion(p)) else NA_character_,
+    seconds   = round(secs, 1)
+  )
+}))
+
+pkg_status
+```
+
+## 3. Load the simulated data
+
+The data copy the design of the study (66 participants, 6 rehearsals each, 3 reports per rehearsal) but are simulated. Expect 1,188 rows, 66 participants and 396 child-behavior reports.
+
+```{webr}
+#| caption: Read the CSV
+affect <- read.csv("data/affect_sim.csv")
+cb <- subset(affect, checkpoint == "child_behavior")
+
+c(rows         = nrow(affect),
+  participants = length(unique(affect$participant_id)),
+  cb_reports   = nrow(cb))
+```
+
+## 4. Plot the ratings
+
+Checks that graphics work. Notice how many baseline ratings sit at the top of the scale.
+
+```{webr}
+#| caption: Pleasure about the child's behavior
+#| fig-width: 7
+#| fig-height: 3.5
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(cb, aes(factor(pleasure, levels = -4:4), fill = loop_type)) +
+  geom_bar(position = "dodge") +
+  labs(x = "Pleasure rating (-4 to +4)", y = "Reports", fill = "Rehearsal") +
+  theme_minimal()
+```
+
+## 5. Paired t-test
+
+One average difference per participant, as in the early analysis.
+
+```{webr}
+#| caption: Paired t-test on participant means
+pm   <- aggregate(pleasure ~ participant_id + loop_type, data = cb, FUN = mean)
+wide <- reshape(pm, idvar = "participant_id", timevar = "loop_type", direction = "wide")
+tt   <- t.test(wide$pleasure.challenge, wide$pleasure.baseline, paired = TRUE)
+tt
+```
+
+## 6. Linear mixed model
+
+The same comparison, with a participant random intercept and challenge slope. Kenward–Roger degrees of freedom need `pbkrtest`; if it is missing, the page falls back to Satterthwaite.
+
+```{webr}
+#| caption: lmer with Kenward-Roger inference
+suppressPackageStartupMessages(library(lmerTest))
+
+lmm_secs <- system.time(
+  m_lmm <- lmer(pleasure ~ challenge + (1 + challenge | participant_id),
+                data = cb, REML = TRUE)
+)[["elapsed"]]
+
+ddf <- if (requireNamespace("pbkrtest", quietly = TRUE)) "Kenward-Roger" else "Satterthwaite"
+kr_secs <- system.time(lmm_tab <- coef(summary(m_lmm, ddf = ddf)))[["elapsed"]]
+
+cat("Singular fit:", isSingular(m_lmm), " | df method:", ddf, "\n\n")
+print(lmm_tab)
+
+cat("\nBecause the data are balanced, the mixed model's t matches the paired t-test:\n")
+print(round(c(paired_t = unname(tt$statistic), lmm_t = lmm_tab["challenge", "t value"]), 3))
+```
+
+## 7. Ordinal mixed model
+
+Confusion is rated 1 to 5, so it is modeled as ordered categories with a cumulative logit link. This is the slowest step.
+
+```{webr}
+#| caption: clmm for confusion
+suppressPackageStartupMessages(library(ordinal))
+cb$confusion_ord <- ordered(cb$confusion, levels = 1:5)
+
+clmm_secs <- system.time(
+  m_clmm <- clmm(confusion_ord ~ challenge + (1 + challenge | participant_id),
+                 data = cb, link = "logit", Hess = TRUE, nAGQ = 1)
+)[["elapsed"]]
+
+print(summary(m_clmm)$coefficients)
+cat("\nOdds ratio for challenge:", round(exp(coef(m_clmm)[["challenge"]]), 2), "\n")
+```
+
+## Summary
+
+```{webr}
+#| caption: Timings in this browser
+step_secs <- function(x) if (exists(x)) round(get(x), 1) else NA
+
+data.frame(
+  step    = c("Install packages (total)", "lmer fit", "Kenward-Roger summary", "clmm fit"),
+  seconds = c(if (exists("pkg_status")) sum(pkg_status$seconds) else NA,
+              step_secs("lmm_secs"), step_secs("kr_secs"), step_secs("clmm_secs")),
+  ok      = c(exists("pkg_status") && all(pkg_status$available),
+              exists("m_lmm"), exists("lmm_tab"), exists("m_clmm"))
+)
+```
+
+**What this tells us**
+
+- If every `ok` is `TRUE`, the full tutorial can run in the browser.
+- If the `clmm` fit takes more than about 30 seconds, the ordinal modules will fit models ahead of time and load them, so students don't wait.
+- If a package shows `available = FALSE`, the module that needs it will show pre-computed output for that step instead.

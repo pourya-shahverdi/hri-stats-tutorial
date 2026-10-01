@@ -1,0 +1,43 @@
+---
+title: "HRI Statistics Tutorial"
+subtitle: "From t-tests to ordinal mixed models, using data shaped like a human–robot interaction study"
+format: live-html
+toc: false
+---
+
+This tutorial teaches the statistical methods used in a human–robot interaction study of how trainees felt during rehearsals with a simulated child. Each module starts from something you already know and adds one idea. The R code runs in your browser, so you don't need to install anything.
+
+::: {.callout-warning}
+## Under construction
+
+The modules are being written. Start with the [browser check](webr-check.qmd) to confirm your browser can run the models.
+:::
+
+## Modules
+
+| # | Topic | Key idea |
+|---|-------|----------|
+| 1 | Paired t-test | Compare each participant with themselves |
+| 2 | Pseudo-replication | 396 ratings from 66 people are not 396 independent observations |
+| 3 | Tests are linear models | A paired t-test is `lm(difference ~ 1)` |
+| 4 | Random intercepts | Partial pooling and the intraclass correlation |
+| 5 | Random slopes | People differ in how much the challenge affects them |
+| 6 | Inference and diagnostics | Kenward–Roger tests, adjustment variables, ceiling effects |
+| 7 | Ordinal regression | Thresholds on a latent scale, and what an odds ratio means |
+| 8 | Ordinal mixed models | `clmm`, conditional odds ratios, convergence |
+| 9 | Interactions and contrasts | Difference-in-differences with `emmeans`, multiplicity |
+
+## The data
+
+All examples use **simulated** data that copy the study's design but contain no participant data:
+
+- 66 participants, each completing 3 baseline and 3 challenging rehearsals
+- after every rehearsal, three reports: feelings about the child's behavior (CB), about their own handling (SH), and overall after trainer feedback (PF)
+- Self-Assessment Manikin ratings of pleasure, arousal and dominance (−4 to +4)
+- confusion, frustration and boredom ratings (1 to 5)
+
+[Download the CSV](data/affect_sim.csv) · [See the simulation code](https://github.com/pourya-shahverdi/hri-stats-tutorial/blob/main/R/simulate_affect.R)
+
+## Running the code
+
+Code boxes have a **Run Code** button. You can edit the code and run it again; **Start Over** restores the original. The first page that runs R downloads it into your browser, which can take a minute.

@@ -1,0 +1,33 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - webr-check.qmd
+
+website:
+  title: "HRI Statistics Tutorial"
+  description: "From t-tests to ordinal mixed models, with runnable R in the browser."
+  site-url: https://pourya-shahverdi.github.io/hri-stats-tutorial/
+  repo-url: https://github.com/pourya-shahverdi/hri-stats-tutorial
+  repo-actions: [issue]
+  page-navigation: true
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: webr-check.qmd
+        text: Browser check
+    right:
+      - text: "Pourya Shahverdi"
+        href: https://pourya-shahverdi.github.io/
+      - icon: github
+        href: https://github.com/pourya-shahverdi/hri-stats-tutorial
+        aria-label: GitHub repository
+  page-footer:
+    center: "All data on this site are simulated. Built with [Quarto Live](https://r-wasm.github.io/quarto-live/) and [webR](https://docs.r-wasm.org/webr/latest/)."
+
+theme:
+  light: cosmo
+  dark: darkly
+toc: true
