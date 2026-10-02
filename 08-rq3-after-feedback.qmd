@@ -1,0 +1,150 @@
+---
+title: "RQ3: After the trainer's feedback"
+subtitle: "How do trainees feel after receiving feedback from the trainer?"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+        - ordinal
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## The plan
+
+- **Data:** the SH report (the last one before feedback) and the PF report (after feedback): 792 reports
+- **Compare:** the challenge gap before feedback (SH) vs after feedback (PF). Does it shrink?
+- **Model:** the same interaction model as RQ2, now with **SH** as the comparison report
+:::
+
+| | CB | SH | PF |
+|---|:-:|:-:|:-:|
+| **baseline** | | ● | ● |
+| **challenging** | | ● | ● |
+
+```{webr}
+#| caption: Setup
+#| edit: false
+suppressPackageStartupMessages({ library(lmerTest); library(ordinal); library(ggplot2) })
+source("R/study_helpers.R")
+d    <- load_affect()
+shpf <- pick_reports(d, c("self_handling", "post_feedback"))   # SH is the comparison report
+```
+
+## 1. Look at the data
+
+By the SH report, the pleasure and arousal gaps were already small (RQ2). Dominance, feeling in control, still had a clear gap, so we use it as the example:
+
+```{webr}
+#| caption: Dominance before and after feedback
+#| fig-height: 4.5
+map_two_reports(d, "dominance", c("self_handling", "post_feedback"))
+```
+
+After feedback, the gap between baseline and challenging rehearsals is smaller: −0.69 before, −0.29 after.
+
+## 2. The model for dominance
+
+```{webr}
+#| caption: Interaction model
+m_dominance <- lmer(dominance ~ loop_type * checkpoint + pair_position + pb_order_group +
+                      feedback_condition +
+                      (1 + challenge + pf || participant_id) + (1 | loop_id),
+                    data = shpf)
+summary(m_dominance)$coefficients
+```
+
+::: {.callout-note}
+## Reminder: the same reading, new comparison groups
+
+Now everything is measured from **baseline, SH**.
+
+| Term | Value | Meaning here |
+|------|-------|--------------|
+| `(Intercept)` | 2.05 | Baseline rehearsal, SH report |
+| `loop_typechallenging` | −0.69 | The challenge gap **before feedback** (SH) |
+| `checkpointpost_feedback` | −0.14 | Baseline rehearsals: PF minus SH (no clear change) |
+| `loop_typechallenging:checkpointpost_feedback` | +0.39 | The **interaction**: the gap shrinks by 0.39 after feedback (p = .003) |
+| `pair_position1`, … | | Design variables, as in RQ1 |
+
+In the random part, `pf` is 1 for the PF report. Each trainee gets their own intercept, challenge effect and SH-to-PF change. A trainee-level interaction was tried too, but the data couldn't support it (singular fit), so it was left out.
+:::
+
+## 3. An ordinal feeling: confusion
+
+This model has three random terms and takes **about a minute** in a browser, so it doesn't run on its own. Press **Run Code** if you want to see it.
+
+```{webr}
+#| caption: Ordinal interaction model (press Run Code)
+#| autorun: false
+m_confusion <- clmm(confusion_ord ~ loop_type * checkpoint + pair_position + pb_order_group +
+                      feedback_condition + (1 | participant_id) +
+                      (0 + challenge | participant_id) + (1 | loop_id),
+                    data = shpf)
+summary(m_confusion)$coefficients
+exp(m_confusion$beta)   # odds ratios
+```
+
+The interaction's odds ratio is about **0.29** (p = .001): after feedback, the extra confusion in challenging rehearsals shrank a lot. An odds ratio below 1 here means the challenge effect got **weaker**.
+
+## 4. All six feelings
+
+```{webr}
+#| caption: Change in the challenge gap from SH to PF
+#| fig-height: 3
+results <- load_results()
+rq3 <- six_results(results, "RQ3", "loop_typechallenging:checkpointpost_feedback")
+show_six(rq3)
+plot_six(rq3, sam_label = "Change in the challenge gap (SAM points)")
+```
+
+## 5. What about order?
+
+```{webr}
+#| caption: The interaction under four versions of the model
+checks <- load_checks()
+order_table(checks, "RQ3", "loop_typechallenging:checkpointpost_feedback")
+```
+
+All versions agree. As in RQ2, both reports come from the same rehearsal, so drift across the session cancels out.
+
+## Answer
+
+::: {.callout-important}
+## RQ3: How do trainees feel after receiving feedback from the trainer?
+
+After feedback, challenging rehearsals felt even more like baseline ones:
+
+- **more in control**: the dominance gap shrank again (−0.69 → −0.29)
+- **less confused**: the extra confusion from challenging rehearsals dropped clearly (odds ratio 0.29)
+- **pleasure and arousal**: the gaps were already small before feedback and stayed that way
+- **frustration and boredom**: no clear change
+
+Be careful with the "why": PF was asked later, about overall feelings, and every rehearsal had feedback. With no comparison group without feedback, we can't say the feedback **caused** the change.
+:::
+
+## Try it
+
+Draw the before-and-after picture for **confusion**. (It shows the averages of the 1–5 answers, a rough summary of the ordinal results.)
+
+```{webr}
+#| exercise: ex_rq3
+#| autorun: false
+map_two_reports(d, "______", c("self_handling", "post_feedback"))
+```
+
+::: {.solution exercise="ex_rq3"}
+Use `"confusion"`. The gap shrinks from about 0.44 to about 0.09 points.
+:::
+
+**Next:** [RQ4](09-rq4-functions.qmd) compares the three kinds of challenging behavior.

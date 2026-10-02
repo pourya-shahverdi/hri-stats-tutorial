@@ -7,6 +7,12 @@ project:
     - 02-repeated-measures.qmd
     - 03-mixed-models.qmd
     - 04-ordinal.qmd
+    - 05-study.qmd
+    - 06-rq1-challenging-behavior.qmd
+    - 07-rq2-own-handling.qmd
+    - 08-rq3-after-feedback.qmd
+    - 09-rq4-functions.qmd
+    - 10-model-checks.qmd
     - webr-check.qmd
 
 website:
@@ -38,12 +44,26 @@ website:
             text: "3. Linear mixed models"
           - href: 04-ordinal.qmd
             text: "4. Rating-scale outcomes"
+      - section: "Affective Dynamics study"
+        contents:
+          - href: 05-study.qmd
+            text: "5. Design and data"
+          - href: 06-rq1-challenging-behavior.qmd
+            text: "RQ1: Challenging behavior"
+          - href: 07-rq2-own-handling.qmd
+            text: "RQ2: Own handling"
+          - href: 08-rq3-after-feedback.qmd
+            text: "RQ3: After feedback"
+          - href: 09-rq4-functions.qmd
+            text: "RQ4: Different functions"
+          - href: 10-model-checks.qmd
+            text: "Model checks"
       - section: "Help"
         contents:
           - href: webr-check.qmd
             text: Browser check
   page-footer:
-    center: "All data on this site are simulated. Built with [Quarto Live](https://r-wasm.github.io/quarto-live/) and [webR](https://docs.r-wasm.org/webr/latest/)."
+    center: "Chapters 1–4 use simulated data; the study section uses de-identified study data. Built with [Quarto Live](https://r-wasm.github.io/quarto-live/) and [webR](https://docs.r-wasm.org/webr/latest/)."
 
 theme:
   light: cosmo

@@ -1,0 +1,159 @@
+---
+title: "5. The Affective Dynamics study"
+subtitle: "The design, the data and a first look"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+Now we use the tools from Chapters 1–4 on a real study: **66 trainees** in robot-mediated human-service training. The data are de-identified.
+
+## The study in one picture
+
+Trainees practice teaching a child with **discrete trial teaching**. A **robot plays the child**. In a **baseline** rehearsal the robot child cooperates. In a **challenging** rehearsal it shows challenging behavior.
+
+After every rehearsal, the trainee answers three short reports:
+
+```{mermaid}
+flowchart LR
+  A["Rehearsal with<br/>the robot child"] --> B["<b>CB</b><br/>How did the child's<br/>behavior make you feel?"]
+  B --> C["<b>SH</b><br/>How do you feel about<br/>how you handled it?"]
+  C --> D["Trainer<br/>feedback"]
+  D --> E["<b>PF</b><br/>How do you feel<br/>overall now?"]
+```
+
+CB and SH are on the same form, right after the rehearsal. PF comes later, after the trainer's feedback. (Question wording is simplified here.)
+
+Each trainee does **6 rehearsals**: 3 baseline and 3 challenging. Each challenging rehearsal shows a behavior with a different **function** (the reason a child might behave that way):
+
+| Function | The robot child… | Why a child might do this |
+|----------|------------------|---------------------------|
+| **PR**, positive reinforcement | makes demands | to get something |
+| **NR**, negative reinforcement | screams and avoids | to escape the task |
+| **AR**, automatic reinforcement | repeats itself | the behavior itself feels good |
+
+## Six feelings in every report
+
+| Feelings | Scale | Model we use |
+|----------|-------|--------------|
+| **Pleasure** (unhappy → happy), **arousal** (calm → excited), **dominance** (controlled → in control) | −4 to +4 (Self-Assessment Manikin) | Linear mixed model ([Ch. 3](03-mixed-models.qmd)) |
+| **Confusion**, **frustration**, **boredom** | 1 = not at all … 5 = very strong | Ordinal mixed model ([Ch. 4](04-ordinal.qmd)) |
+
+## The data
+
+```{webr}
+#| caption: Load the data
+source("R/study_helpers.R")   # small helper functions for this part
+d <- load_affect()
+
+head(d[, c("participant_id", "loop_id", "loop_type", "function_class",
+           "checkpoint", "pleasure", "confusion")], 6)
+```
+
+| Column | Meaning |
+|--------|---------|
+| `participant_id` | the trainee |
+| `loop_id` | one rehearsal ("loop") |
+| `loop_type` | baseline or challenging |
+| `function_class` | PR, NR, AR (or baseline) |
+| `checkpoint` | which report: `child_behavior` (CB), `self_handling` (SH), `post_feedback` (PF) |
+| `pair_position` | which pair of rehearsals: 1st, 2nd or 3rd in the session |
+| `pb_order_group` | which order the three challenging behaviors came in (3 orders) |
+| `feedback_condition` | the trainer's feedback style: supportive or neutral |
+
+```{webr}
+#| caption: How many reports?
+nrow(d)                        # 66 trainees x 6 rehearsals x 3 reports
+table(d$loop_type, d$checkpoint)
+```
+
+Every trainee gave **18 reports**, so their reports are related, just like the sessions in [Chapter 2](02-repeated-measures.qmd). The reports from one rehearsal belong together too:
+
+```{mermaid}
+flowchart TB
+  P["Trainee<br/>(66)"] --> L["Rehearsal<br/>(6 per trainee)"] --> R["Report<br/>(3 per rehearsal)"]
+```
+
+That's why every model in this part has a **random intercept for each trainee**, `(1 | participant_id)`. When we use two reports from the same rehearsal, we add one for each rehearsal, `(1 | loop_id)`.
+
+## A first look
+
+Average of each feeling for each report. Bars show ±1 standard error. Each panel has its own scale, so check the numbers on the axis: boredom barely moves.
+
+```{webr}
+#| caption: Average feelings across the three reports
+#| fig-height: 6
+library(ggplot2)
+feelings <- c(sam_feelings, ordinal_feelings)
+avg <- do.call(rbind, lapply(feelings, function(v)
+  group_means(d, v, c("loop_type", "checkpoint"))))
+avg$feeling <- factor(avg$feeling, levels = feelings)
+
+ggplot(avg, aes(checkpoint, mean, colour = loop_type, group = loop_type)) +
+  geom_line(linewidth = 1) +
+  geom_pointrange(aes(ymin = mean - se, ymax = mean + se)) +
+  facet_wrap(~ feeling, scales = "free_y") +
+  scale_x_discrete(labels = c("CB", "SH", "PF")) +
+  scale_colour_manual(values = rehearsal_cols) +
+  labs(x = "Report", y = "Average rating", colour = "Rehearsal") +
+  theme_minimal(base_size = 13) + theme(legend.position = "bottom")
+```
+
+What stands out: in **challenging** rehearsals, the feelings about the **child's behavior (CB)** are worse than in baseline. In the SH and PF reports, most lines move back toward baseline. The four research questions test these patterns.
+
+## How the ratings are spread
+
+```{webr}
+#| caption: Pleasure and confusion about the child's behavior
+#| fig-height: 3.5
+cb <- subset(d, checkpoint == "child_behavior")
+ggplot(cb, aes(factor(pleasure, levels = -4:4), fill = loop_type)) +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = rehearsal_cols) +
+  labs(x = "Pleasure (-4 to +4)", y = "Reports", fill = NULL) +
+  theme_minimal(base_size = 13)
+
+ggplot(cb, aes(factor(confusion, levels = 1:5), fill = loop_type)) +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = rehearsal_cols) +
+  labs(x = "Confusion (1 = not at all)", y = "Reports", fill = NULL) +
+  theme_minimal(base_size = 13)
+```
+
+- **Pleasure** uses the whole scale, so we treat it as a number. Many baseline answers sit at the top (+4), so remember the ceiling.
+- **Confusion** is mostly "not at all", with a few higher answers. That's a job for an **ordinal** model.
+
+(Boredom answers of 4 and 5 were so rare that `load_affect()` combines them into "4 or more".)
+
+## The four research questions
+
+In robot-mediated human-service training:
+
+| | Question | What we compare |
+|---|----------|-----------------|
+| [RQ1](06-rq1-challenging-behavior.qmd) | How does the recipient's challenging behavior influence trainees' affect? | **CB:** challenging vs baseline |
+| [RQ2](07-rq2-own-handling.qmd) | How do trainees feel about their own handling of that challenging behavior? | **CB → SH:** does the challenge gap change? |
+| [RQ3](08-rq3-after-feedback.qmd) | How do trainees feel after receiving feedback from the trainer? | **SH → PF:** does the challenge gap change? |
+| [RQ4](09-rq4-functions.qmd) | How does trainees' affect differ across challenging behaviors with different functions? | **CB, challenging only:** PR vs NR vs AR |
+
+::: {.callout-note}
+## How the models were built
+
+Every model on the next pages has:
+
+- **the comparison** that answers the question,
+- **the design variables** above, so that when a rehearsal happened, the behavior order and the feedback style can't blur the comparison,
+- **random effects** that are as rich as the data allow: each trainee gets their own version of the effect being tested.
+
+The [Model checks](10-model-checks.qmd) page tests these models in several ways: residuals, an ordinal version of the SAM models, the proportional-odds assumption, and different ways of handling order. For pleasure, arousal and dominance, the estimates match the lab's full analysis.
+:::

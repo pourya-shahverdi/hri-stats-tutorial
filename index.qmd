@@ -5,9 +5,9 @@ format: live-html
 toc: false
 ---
 
-This tutorial introduces the statistics behind many human–robot interaction (HRI) studies. It starts from the basics and builds up one idea at a time, using small made-up studies about how much people trust a robot. You can run and edit every piece of R code in your browser, with nothing to install.
+This tutorial introduces the statistics behind many human–robot interaction (HRI) studies. Part 1 starts from the basics and builds up one idea at a time, using small made-up studies about how much people trust a robot. Part 2 uses the same tools on a real study. You can run and edit every piece of R code in your browser, with nothing to install.
 
-## Chapters
+## Part 1: The basics
 
 | | Chapter | The question it answers |
 |---|---------|------------------------|
@@ -18,14 +18,29 @@ This tutorial introduces the statistics behind many human–robot interaction (H
 
 Work through the chapters in order. Each one ends with a short exercise and self-check questions.
 
-## The example studies
+## Part 2: The Affective Dynamics study
 
-All data are **simulated**, so no real participants are involved.
+How do trainees feel during robot-mediated human-service training? 66 trainees rehearsed with a robot child that sometimes showed challenging behavior.
+
+| | Page | The question it answers |
+|---|------|------------------------|
+| 5 | [Design and data](05-study.qmd) | What was measured, and what does the data look like? |
+| RQ1 | [Challenging behavior](06-rq1-challenging-behavior.qmd) | How does the recipient's challenging behavior influence trainees' affect? |
+| RQ2 | [Own handling](07-rq2-own-handling.qmd) | How do trainees feel about their own handling of that behavior? |
+| RQ3 | [After feedback](08-rq3-after-feedback.qmd) | How do trainees feel after receiving feedback from the trainer? |
+| RQ4 | [Different functions](09-rq4-functions.qmd) | How does affect differ across challenging behaviors with different functions? |
+| | [Model checks](10-model-checks.qmd) | How sure can we be about the answers? |
+
+## The data
+
+**Part 1** uses **simulated** data, so no real participants are involved:
 
 - **Chapter 1:** 40 visitors each meet one robot, neutral or expressive, once, and rate their trust from 0 to 100. [Download](data/robot_one_visit.csv)
 - **Chapters 2–4:** 30 people each meet the same robot in 5 weekly sessions. After each session they rate trust from 0 to 100 and answer *"I would trust this robot to help me"* from 1 (strongly disagree) to 5 (strongly agree). [Download](data/robot_sessions.csv)
 
 The code that creates the data is in the [GitHub repository](https://github.com/pourya-shahverdi/hri-stats-tutorial/blob/main/R/simulate_tutorial_data.R).
+
+**Part 2** uses the de-identified study data: 66 trainees × 6 rehearsals × 3 reports = 1,188 rows. [Download](data/affect_n66.csv)
 
 ## Using the code boxes
 
@@ -33,7 +48,3 @@ The code that creates the data is in the [GitHub repository](https://github.com/
 - **Try it** boxes have blanks (`______`) to fill in. Use **Hint** and **Solution** if you get stuck.
 - The first page you open downloads R into your browser, which can take a minute. Later pages are faster.
 - If code doesn't run, try the [browser check](webr-check.qmd) page or a different browser (Chrome, Edge or Firefox work well).
-
-## What comes next
-
-After these chapters, the tutorial applies the same tools to a real study design: how trainees' feelings change during rehearsals with a robot.

@@ -269,4 +269,4 @@ Each person gave five answers, and answers from the same person are related. `cl
 - Coefficients are **log-odds**; `exp()` turns them into **odds ratios**. Predicted probabilities are easier to explain.
 - With repeated answers from the same people, use an **ordinal mixed model** (`clmm()`) with a random effect for each person.
 
-**Coming next:** the same tools applied to a real study design, how trainees' feelings change during rehearsals with a robot.
+**Next:** [Part 2](05-study.qmd) uses these tools on a real study: how trainees' feelings change during rehearsals with a robot.

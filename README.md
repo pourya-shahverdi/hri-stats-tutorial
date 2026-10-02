@@ -12,7 +12,9 @@ GitHub Pages with no server.
 
 **Live site:** https://pourya-shahverdi.github.io/hri-stats-tutorial/
 
-All data in this repository are simulated. No real participants are involved.
+Part 1 (chapters 1–4) uses simulated data. Part 2 uses the de-identified
+Affective Dynamics study data (`data/affect_n66.csv`), trimmed to the columns
+the tutorial needs.
 
 ## Chapters
 
@@ -22,6 +24,9 @@ All data in this repository are simulated. No real participants are involved.
 | `02-repeated-measures.qmd` | Same people, many measurements: independence, pseudo-replication, paired t-test |
 | `03-mixed-models.qmd` | Linear mixed models: fixed and random effects, random intercepts and slopes |
 | `04-ordinal.qmd` | Rating-scale outcomes: ordinal regression (`clm`) and ordinal mixed models (`clmm`) |
+| `05-study.qmd` | Part 2: the Affective Dynamics study, design, data and descriptives |
+| `06-...` to `09-...qmd` | Part 2: one page per research question (RQ1–RQ4) |
+| `10-model-checks.qmd` | Part 2: how the models were chosen and checked |
 
 ## Publishing
 
@@ -47,14 +52,30 @@ from disk does not work, because webR must be served over HTTP.
 |------|------------|
 | `_quarto.yml` | Site settings and sidebar navigation |
 | `index.qmd` | Home page |
-| `01-...qmd` to `04-...qmd` | The four chapters |
+| `01-...qmd` to `04-...qmd` | Part 1 chapters |
+| `05-...qmd` to `10-...qmd` | Part 2 pages |
 | `webr-check.qmd` | Checks that the browser can install the packages and fit the models |
 | `data/robot_one_visit.csv` | Chapter 1 data: 40 people, one rating each |
 | `data/robot_sessions.csv` | Chapters 2–4 data: 30 people × 5 sessions |
 | `R/simulate_tutorial_data.R` | Code that creates the two files above |
-| `data/affect_sim.csv`, `R/simulate_affect.R` | Simulated affect-study data, kept for the later study chapters |
+| `data/affect_n66.csv` | Part 2 data: 66 trainees × 6 rehearsals × 3 reports (1,188 rows) |
+| `R/study_helpers.R` | Helper functions for Part 2 (loading data, reading results, plots) |
+| `R/fit_study_models.R` | Fits every Part 2 model and its checks; writes the two files below |
+| `data/study_results.csv` | Main result for each research question and feeling |
+| `data/study_checks.csv` | The same results under alternative model versions |
+| `data/affect_sim.csv`, `R/simulate_affect.R` | Simulated copy of the study design (not used by the pages) |
 | `_extensions/r-wasm/live/` | Quarto Live extension (v0.2.0) |
 | `.github/workflows/publish.yml` | Renders and deploys the site |
+
+## Refit the Part 2 models
+
+The ordinal mixed models take minutes in a browser, so the pages read
+results fitted ahead of time. After changing `R/fit_study_models.R` (or the
+data), refit everything in RStudio, then commit the two CSV files:
+
+```r
+source("R/fit_study_models.R")
+```
 
 ## Regenerate the data
 

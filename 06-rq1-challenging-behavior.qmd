@@ -1,0 +1,213 @@
+---
+title: "RQ1: The child's challenging behavior"
+subtitle: "How does the recipient's challenging behavior influence trainees' affect?"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+        - ordinal
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## The plan
+
+- **Data:** the CB reports (feelings about the child's behavior): 66 trainees × 6 rehearsals = 396 reports
+- **Compare:** challenging vs baseline rehearsals
+- **Model:** a mixed model for each feeling. It accounts for the study design (when in the session each rehearsal happened, and more), and gives each trainee their own intercept and slope
+:::
+
+| | CB | SH | PF |
+|---|:-:|:-:|:-:|
+| **baseline** | ● | | |
+| **challenging** | ● | | |
+
+```{webr}
+#| caption: Setup
+#| edit: false
+suppressPackageStartupMessages({ library(lmerTest); library(ordinal); library(ggplot2) })
+source("R/study_helpers.R")
+d  <- load_affect()
+cb <- pick_reports(d, "child_behavior")
+```
+
+## 1. Look at the data
+
+Each grey line is one trainee: their average pleasure about the child in baseline vs challenging rehearsals. The red line is the average.
+
+```{webr}
+#| caption: Pleasure about the child, trainee by trainee
+#| fig-height: 4
+per_person <- aggregate(pleasure ~ participant_id + loop_type, data = cb, FUN = mean)
+
+ggplot(per_person, aes(loop_type, pleasure, group = participant_id)) +
+  geom_line(alpha = 0.3) +
+  stat_summary(aes(group = 1), fun = mean, geom = "line", linewidth = 2, colour = "#d6604d") +
+  labs(x = NULL, y = "Average pleasure (-4 to +4)") +
+  theme_minimal(base_size = 13)
+```
+
+Most lines go **down** (50 of 66 trainees), but by **different amounts**. People start at different levels and react differently, which is why the model gives each trainee their own intercept and their own slope.
+
+## 2. The model for pleasure
+
+```{webr}
+#| caption: Linear mixed model
+m_pleasure <- lmer(pleasure ~ loop_type + pair_position + pb_order_group + feedback_condition +
+                     (1 + challenge | participant_id), data = cb)
+summary(m_pleasure)$coefficients
+```
+
+```{webr}
+#| caption: What the two key numbers mean
+#| fig-height: 4
+map_rq1(d, "pleasure")
+```
+
+::: {.callout-note}
+## Reminder: intercept and slope
+
+| Term | Value | Meaning here |
+|------|-------|--------------|
+| `(Intercept)` | 2.27 | Average pleasure about the child in **baseline** rehearsals (the comparison group) |
+| `loop_typechallenging` | −1.73 | The **slope**: how much pleasure changes when the child is challenging (p < .001) |
+| `pair_position1`, `pb_order_group1`, … | | **Design variables**: not part of the question (see below) |
+
+The random part, `(1 + challenge | participant_id)`, gives each trainee their **own intercept** (their usual level) and their **own slope** (how strongly the challenge affects them).
+:::
+
+::: {.callout-important}
+## Why the design variables are in the model
+
+The study design has three features that could shift the ratings:
+
+| Variable | What it is |
+|----------|------------|
+| `pair_position` | Which pair of rehearsals: 1st, 2nd or 3rd in the session. Feelings can change as trainees warm up or tire. |
+| `pb_order_group` | Which order the three challenging behaviors came in (3 orders). |
+| `feedback_condition` | The trainer's feedback style, supportive or neutral. |
+
+Adding them makes sure these features can't blur or fake the comparison we care about. They use **sum coding**: each row compares one level with the average of all levels. That keeps the intercept meaning "the average baseline rating". For example, `pair_position1` = −0.26 says pleasure in the first pair was 0.26 points below average: trainees warmed up.
+:::
+
+How much do trainees differ in their slopes?
+
+```{webr}
+#| caption: Random effects
+VarCorr(m_pleasure)
+```
+
+The slopes vary with an SD of about 1.1 points: for some trainees the challenge hardly mattered, for others it mattered a lot.
+
+## 3. An ordinal feeling: confusion
+
+Confusion is rated 1–5, so we use an **ordinal mixed model**, `clmm()`. It has the same design variables, and each trainee gets their own intercept and their own challenge effect. (It takes a few seconds.)
+
+```{webr}
+#| caption: Ordinal mixed model
+m_confusion <- clmm(confusion_ord ~ loop_type + pair_position + pb_order_group + feedback_condition +
+                      (1 | participant_id) + (0 + challenge | participant_id), data = cb)
+summary(m_confusion)$coefficients
+exp(m_confusion$beta["loop_typechallenging"])   # odds ratio
+```
+
+::: {.callout-note}
+## Reminder: an ordinal model has cut-points instead of one intercept
+
+- The first four rows (`1|2`, `2|3`, …) are the **cut-points** on the hidden confusion scale. They play the role of the intercept.
+- `loop_typechallenging` = 1.68 is the **slope**: how far challenging rehearsals shift trainees up the hidden scale.
+- `exp()` of it = 5.4 is the **odds ratio**: the odds of a higher confusion answer are about 5.4 times higher.
+
+In the random part, `(1 | participant_id)` gives each trainee their own intercept and `(0 + challenge | participant_id)` their own challenge effect.
+:::
+
+In plain numbers, for a typical trainee:
+
+```{webr}
+#| caption: Chance of feeling at least a little confused
+cuts  <- m_confusion$alpha
+shift <- m_confusion$beta[["loop_typechallenging"]]
+round(1 - plogis(cuts[1] - c(baseline = 0, challenging = shift)), 2)
+```
+
+The chance of reporting any confusion (2 or higher) goes from about **22%** to about **60%**.
+
+## 4. All six feelings
+
+The same kind of model was fitted for every feeling. The ordinal models take a while in a browser, so these results were fitted ahead of time (see [Model checks](10-model-checks.qmd)).
+
+```{webr}
+#| caption: Challenging vs baseline, every feeling
+#| fig-height: 3
+results <- load_results()
+rq1 <- six_results(results, "RQ1", "loop_typechallenging")
+show_six(rq1)
+plot_six(rq1, sam_label = "Challenging minus baseline (SAM points)")
+```
+
+The `random_effects` column shows what each model used: every trainee has their own intercept and their own challenge effect.
+
+## 5. What about order?
+
+In every pair the **baseline rehearsal came first** and the challenging one second, and feelings changed as the session went on. Could that mix into the challenge effect? We refit each model three other ways:
+
+- **No order variables:** without `pair_position`, `pb_order_group` and `feedback_condition`
+- **Steady trend instead:** replace the pair position with a steady drift across all 6 rehearsals, which also accounts for "challenging always came second"
+- **Planned order only:** leave out the 5 trainees whose rehearsals were not run in the planned order
+
+```{webr}
+#| caption: The challenge effect under four versions of the model
+checks <- load_checks()
+order_table(checks, "RQ1", "loop_typechallenging")
+```
+
+Numbers are SAM points (pleasure, arousal, dominance) or odds ratios (the others).
+
+- **Pleasure, arousal, dominance:** almost no change. The design was balanced, so the order variables don't move the estimate.
+- **The steady-trend version makes most effects a little bigger.** Feelings improved over the session, and challenging rehearsals always came later, so ignoring the drift slightly *hides* the drop. The main model is, if anything, cautious.
+- **Boredom is the exception.** With a steady trend it is no longer clear (p ≈ .13), so treat the boredom result with caution.
+
+The order "baseline first, challenging second" is part of the design. Statistics can adjust for steady drift, but only fully separating the two would need some trainees to get the challenging rehearsal first.
+
+## Answer
+
+::: {.callout-important}
+## RQ1: How does the recipient's challenging behavior influence trainees' affect?
+
+When the robot child behaved challengingly, trainees felt worse about its behavior:
+
+- **less pleasure** (−1.7 points) and **less in control** (dominance −1.3)
+- **more aroused** (+0.5)
+- **more confused** (odds × 5.4) and **more frustrated** (odds × 5.7)
+- possibly a little **less bored** (odds × 0.22), but this one depends on how order is handled
+
+These results hold when order is handled differently (except boredom).
+:::
+
+## Try it
+
+Fit the pleasure model again for **dominance**. Is the slope the same as in the table above?
+
+```{webr}
+#| exercise: ex_rq1
+#| autorun: false
+m_try <- lmer(______ ~ loop_type + pair_position + pb_order_group + feedback_condition +
+                (1 + challenge | participant_id), data = cb)
+summary(m_try)$coefficients
+```
+
+::: {.solution exercise="ex_rq1"}
+Replace the blank with `dominance`. The intercept is 2.19 (baseline average) and the slope is −1.30, the same as in the table. `pair_position1` is clearly negative: trainees felt less in control in the first pair.
+:::
+
+**Next:** [RQ2](07-rq2-own-handling.qmd) asks how trainees felt about their *own* handling of the behavior.

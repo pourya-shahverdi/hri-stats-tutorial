@@ -1,0 +1,205 @@
+---
+title: "RQ4: Different functions of challenging behavior"
+subtitle: "How does trainees' affect differ across challenging behaviors with different functions?"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+        - ordinal
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## The plan
+
+- **Data:** CB reports from **challenging** rehearsals only: 66 trainees × 3 functions = 198 reports
+- **Compare:** PR (demanding) vs NR (screaming, avoiding) vs AR (repetition)
+- **Model:** a mixed model with a predictor that has **three** levels, plus the design variables
+:::
+
+| | CB | SH | PF |
+|---|:-:|:-:|:-:|
+| **challenging: PR, NR, AR** | ● | | |
+
+```{webr}
+#| caption: Setup
+#| edit: false
+suppressPackageStartupMessages({ library(lmerTest); library(ordinal); library(ggplot2) })
+source("R/study_helpers.R")
+d  <- load_affect()
+ch <- subset(d, checkpoint == "child_behavior" & loop_type == "challenging")
+ch$function_class <- factor(ch$function_class, levels = c("PR", "NR", "AR"))  # PR = comparison
+```
+
+## 1. Look at the data
+
+```{webr}
+#| caption: Average feelings for each function
+#| fig-height: 5
+feelings <- c(sam_feelings, ordinal_feelings)
+avg <- do.call(rbind, lapply(feelings, function(v) group_means(ch, v, "function_class")))
+avg$feeling <- factor(avg$feeling, levels = feelings)
+
+ggplot(avg, aes(function_class, mean)) +
+  geom_pointrange(aes(ymin = mean - se, ymax = mean + se), colour = "#d6604d") +
+  facet_wrap(~ feeling, scales = "free_y") +
+  labs(x = NULL, y = "Average rating (bars: 1 SE)") +
+  theme_minimal(base_size = 13)
+```
+
+The NR behavior (screaming, avoiding) stands out for **pleasure** and **dominance**.
+
+## 2. The model for pleasure
+
+With three groups, R picks one as the comparison (here PR) and gives a slope for each of the other two.
+
+```{webr}
+#| caption: Linear mixed model with three groups
+m_pleasure <- lmer(pleasure ~ function_class + challenge_position + pb_order_group +
+                     feedback_condition + (1 | participant_id), data = ch)
+summary(m_pleasure)$coefficients
+```
+
+```{webr}
+#| caption: What the three numbers mean
+#| fig-height: 4.5
+map_rq4(d, "pleasure")
+```
+
+::: {.callout-note}
+## Reminder: one intercept, one slope per other group
+
+| Term | Value | Meaning here |
+|------|-------|--------------|
+| `(Intercept)` | 0.86 | Average pleasure for **PR** (the comparison group) |
+| `function_classNR` | −1.21 | NR minus PR (p < .001) |
+| `function_classAR` | +0.23 | AR minus PR (no clear difference) |
+| `challenge_position1`, … | | Design variables: whether this was the 1st, 2nd or 3rd challenging rehearsal, the order group and the feedback style |
+
+Each trainee saw each function only once, so the random part can only give each trainee their own intercept, `(1 | participant_id)`.
+:::
+
+**Do the three differ at all?** One overall test answers that:
+
+```{webr}
+#| caption: Overall test
+anova(m_pleasure)
+```
+
+The `function_class` row is the overall test (p < .001). The other rows test the design variables.
+
+**What about NR vs AR?** Make NR the comparison group and fit again:
+
+```{webr}
+#| caption: Change the comparison group
+ch$function_NR <- relevel(ch$function_class, ref = "NR")
+m_nr <- lmer(pleasure ~ function_NR + challenge_position + pb_order_group +
+               feedback_condition + (1 | participant_id), data = ch)
+summary(m_nr)$coefficients[1:3, ]
+```
+
+AR is 1.44 points more pleasant than NR (p < .001).
+
+## 3. All six feelings
+
+The ordinal models were fitted ahead of time. First the overall test for each feeling:
+
+```{webr}
+#| caption: Overall test per feeling
+results <- load_results()
+overall <- results[results$rq == "RQ4" & results$term == "overall", c("feeling", "p")]
+overall$clear_difference <- ifelse(overall$p < 0.05, "yes", "no")
+overall$p <- signif(overall$p, 2)
+rownames(overall) <- NULL
+overall
+```
+
+Then the NR comparisons, where most of the differences are:
+
+```{webr}
+#| caption: NR compared with PR and with AR
+#| fig-height: 3
+nr_vs_pr <- six_results(results, "RQ4", "function_classNR")
+show_six(nr_vs_pr)
+plot_six(nr_vs_pr, sam_label = "NR minus PR (SAM points)")
+
+ar_vs_nr <- six_results(results, "RQ4", "function_NRAR")
+show_six(ar_vs_nr)
+plot_six(ar_vs_nr, sam_label = "AR minus NR (SAM points)")
+```
+
+## 4. What about order?
+
+The three functions were shown in three different orders (`pb_order_group`), so each function appeared first, second or third equally often. The four versions of each comparison:
+
+```{webr}
+#| caption: NR minus PR, four versions
+checks <- load_checks()
+order_table(checks, "RQ4", "function_classNR")
+```
+
+```{webr}
+#| caption: AR minus NR, four versions
+order_table(checks, "RQ4", "function_NRAR")
+```
+
+The pleasure and dominance differences hold in every version. Arousal (NR vs PR) hovers around p = .05, so it isn't a clear result.
+
+::: {.callout-warning}
+## Three things to keep in mind
+
+- **Many tests, a few false alarms.** We ran a lot of tests here. As in [Chapter 1](01-basics.qmd), a few p-values near .05 can appear by luck, so treat frustration (overall p = .044) and boredom (p = .023) with caution.
+- **Boredom is rare.** Most boredom answers are "not at all", which makes its odds ratios huge and very uncertain (look at the wide intervals).
+- **Function and task go together.** Each function was shown during a different teaching task (PR with tacting and labeling, NR with receptive instructions, AR with receptive expression). A difference could come from the task as well as the behavior.
+:::
+
+## Answer
+
+::: {.callout-important}
+## RQ4: How does trainees' affect differ across behaviors with different functions?
+
+The **NR** behavior (screaming and avoiding, to escape the task) was the hardest for trainees:
+
+- **least pleasant**: 1.2 points below PR and 1.4 below AR
+- **least in control**: dominance about 0.5–0.6 points lower than for PR and AR
+
+PR (demanding) and AR (repetition) felt about the same. Arousal and confusion did not clearly differ between the three. Frustration and boredom showed weak differences (NR higher than AR) that need caution.
+:::
+
+## Try it
+
+Fit the pleasure model with **AR** as the comparison group. What is the PR minus AR difference?
+
+```{webr}
+#| exercise: ex_rq4
+#| autorun: false
+ch$function_AR <- relevel(ch$function_class, ref = "______")
+m_ar <- lmer(pleasure ~ function_AR + challenge_position + pb_order_group +
+               feedback_condition + (1 | participant_id), data = ch)
+summary(m_ar)$coefficients[1:3, ]
+```
+
+::: {.solution exercise="ex_rq4"}
+Use `ref = "AR"`. PR minus AR is −0.23 (no clear difference), and NR minus AR is −1.44.
+:::
+
+## Summary of the whole study
+
+| | Question | Short answer |
+|---|----------|--------------|
+| RQ1 | Challenging behavior | Worse feelings about the child: less pleasure and control, more arousal, confusion and frustration |
+| RQ2 | Own handling | Much better than about the child: pleasure near baseline, control partly back, calmer, less confused |
+| RQ3 | After feedback | The gaps shrank further for control and confusion |
+| RQ4 | Different functions | NR (screaming, avoiding) was the least pleasant and gave the least sense of control |
+
+How sure can we be? See [Model checks](10-model-checks.qmd).

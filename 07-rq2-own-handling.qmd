@@ -1,0 +1,149 @@
+---
+title: "RQ2: Feelings about their own handling"
+subtitle: "How do trainees feel about their own handling of that challenging behavior?"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+        - ordinal
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## The plan
+
+- **Data:** the CB and SH reports, answered together on one form after each rehearsal: 792 reports
+- **Compare:** the challenge gap (challenging minus baseline) in CB vs in SH. Does it shrink when trainees rate their own handling?
+- **Model:** rehearsal type × report, an **interaction** model ([Chapter 3](03-mixed-models.qmd)), with the same design variables as RQ1
+:::
+
+| | CB | SH | PF |
+|---|:-:|:-:|:-:|
+| **baseline** | ● | ● | |
+| **challenging** | ● | ● | |
+
+```{webr}
+#| caption: Setup
+#| edit: false
+suppressPackageStartupMessages({ library(lmerTest); library(ordinal); library(ggplot2) })
+source("R/study_helpers.R")
+d    <- load_affect()
+cbsh <- pick_reports(d, c("child_behavior", "self_handling"))   # CB is the comparison report
+```
+
+## 1. Look at the data
+
+```{webr}
+#| caption: Pleasure in the CB and SH reports
+#| fig-height: 4.5
+map_two_reports(d, "pleasure", c("child_behavior", "self_handling"))
+```
+
+In baseline rehearsals the two reports are almost the same. In challenging rehearsals, pleasure about the trainee's **own handling** is much higher than about the child's behavior. The gap between the lines shrinks from −1.73 to −0.32.
+
+## 2. The model for pleasure
+
+```{webr}
+#| caption: Interaction model
+m_pleasure <- lmer(pleasure ~ loop_type * checkpoint + pair_position + pb_order_group +
+                     feedback_condition +
+                     (1 + challenge * sh || participant_id) + (1 | loop_id),
+                   data = cbsh)
+summary(m_pleasure)$coefficients
+```
+
+::: {.callout-note}
+## Reminder: reading an interaction model
+
+The comparison groups are **baseline** and **CB**, so everything is measured from the baseline-CB point.
+
+| Term | Value | Meaning here |
+|------|-------|--------------|
+| `(Intercept)` | 2.27 | Baseline rehearsal, CB report |
+| `loop_typechallenging` | −1.73 | The challenge gap **in the CB report** (same as RQ1) |
+| `checkpointself_handling` | −0.10 | Baseline rehearsals: SH minus CB (almost nothing) |
+| `loop_typechallenging:checkpointself_handling` | +1.41 | The **interaction**: how much the challenge gap changes from CB to SH (p < .001) |
+| `pair_position1`, … | | Design variables, as in RQ1 |
+
+To get SH minus CB **in challenging rehearsals**, add the two report terms: −0.10 + 1.41 = **+1.31** points.
+:::
+
+::: {.callout-note}
+## Reading the random part
+
+- `(1 + challenge * sh || participant_id)`: each trainee gets their own intercept, their own challenge effect, their own CB-to-SH change and their own interaction. `sh` is 1 for the SH report and 0 for CB. The double bar `||` means "estimate these separately", which keeps the model simpler.
+- `(1 | loop_id)`: CB and SH were answered on the same form after the same rehearsal, so each rehearsal gets its own intercept too.
+:::
+
+## 3. All six feelings
+
+For each feeling we keep the **interaction**. The ordinal models were fitted ahead of time.
+
+```{webr}
+#| caption: Change in the challenge gap from CB to SH
+#| fig-height: 3
+results <- load_results()
+rq2 <- six_results(results, "RQ2", "loop_typechallenging:checkpointself_handling")
+show_six(rq2)
+plot_six(rq2, sam_label = "Change in the challenge gap (SAM points)")
+```
+
+How to read it: if the interaction has the **opposite sign** to the RQ1 gap, the gap **shrinks**.
+
+- Pleasure (gap −1.73, interaction +1.41), dominance (−1.30, +0.62) and arousal (+0.52, −0.43): the gap shrinks.
+- Confusion: odds ratio 0.37, so the extra confusion from challenging rehearsals is smaller in the SH report.
+- Frustration and boredom: the intervals include 1, so there's no clear change.
+
+The `random_effects` column shows that not every model could include everything. For arousal, the trainees' slopes could not be estimated (the model was "singular", [Chapter 3](03-mixed-models.qmd)). For frustration and boredom, the rehearsal intercept could not be estimated. Each model uses the richest structure its data could support.
+
+## 4. What about order?
+
+```{webr}
+#| caption: The interaction under four versions of the model
+checks <- load_checks()
+order_table(checks, "RQ2", "loop_typechallenging:checkpointself_handling")
+```
+
+Every version gives the same answer. That's expected: CB and SH were answered **at the same moment**, so anything that drifts across the session affects both reports equally and cancels out in this comparison.
+
+## Answer
+
+::: {.callout-important}
+## RQ2: How do trainees feel about their own handling of the challenging behavior?
+
+Much better than they felt about the child's behavior. In challenging rehearsals, their feelings about their own handling were:
+
+- **more pleasant**: +1.31 points above the CB report, close to baseline levels
+- **more in control**: the dominance gap halved (−1.30 → −0.69)
+- **calmer**: the extra arousal mostly disappeared (+0.52 → +0.09)
+- **less confused**: the extra confusion was smaller (odds ratio 0.37)
+- for **frustration and boredom**, the challenge effect did not clearly change
+
+CB and SH were answered at the same moment, so this is a difference in **what they were rating**, not a change over time.
+:::
+
+## Try it
+
+Draw the same picture for **dominance**. How big is the gap in each report?
+
+```{webr}
+#| exercise: ex_rq2
+#| autorun: false
+map_two_reports(d, "______", c("child_behavior", "self_handling"))
+```
+
+::: {.solution exercise="ex_rq2"}
+Use `"dominance"`. The gap shrinks from −1.30 (CB) to −0.69 (SH), an interaction of +0.62.
+:::
+
+**Next:** [RQ3](08-rq3-after-feedback.qmd) looks at feelings after the trainer's feedback.

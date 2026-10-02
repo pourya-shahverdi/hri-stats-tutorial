@@ -1,0 +1,43 @@
+"rq","feeling","term","model","random_effects","estimate","lower","upper","p"
+"RQ1","pleasure","loop_typechallenging","Linear mixed model","(1 + challenge | participant_id)",-1.73232323232323,-2.13175613427011,-1.33289033037635,1.95972107822399e-12
+"RQ1","arousal","loop_typechallenging","Linear mixed model","(1 + challenge | participant_id)",0.515151515151517,0.257149547357664,0.773153482945369,0.000171695814350493
+"RQ1","dominance","loop_typechallenging","Linear mixed model","(1 + challenge | participant_id)",-1.3030303030303,-1.73250072700194,-0.87355987905867,7.65166084112334e-08
+"RQ1","confusion","loop_typechallenging","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id)",5.37143435765928,3.05156039034321,9.45493562898079,5.6363240030322e-09
+"RQ1","frustration","loop_typechallenging","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id)",5.73641480301636,1.88903869764378,17.4196827377384,0.0020535778864468
+"RQ1","boredom","loop_typechallenging","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id)",0.219402378239039,0.0586178021819462,0.821207922936635,0.0242898764803907
+"RQ2","pleasure","loop_typechallenging:checkpointself_handling","Linear mixed model","(1 + challenge * sh || participant_id) + (1 | loop_id)",1.40909090909088,1.01503340881526,1.80314840936649,1.24351211539387e-10
+"RQ2","arousal","loop_typechallenging:checkpointself_handling","Linear mixed model","(1 | participant_id) + (1 | loop_id)",-0.429292929292929,-0.719755559972319,-0.13883029861354,0.00387132012637046
+"RQ2","dominance","loop_typechallenging:checkpointself_handling","Linear mixed model","(1 + challenge * sh || participant_id) + (1 | loop_id)",0.616161616161648,0.30959940742292,0.922723824900375,0.00012539877854156
+"RQ2","confusion","loop_typechallenging:checkpointself_handling","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id) + (1 | loop_id)",0.37011386617524,0.162357075163431,0.84372223259931,0.018069012897628
+"RQ2","frustration","loop_typechallenging:checkpointself_handling","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id)",0.461665460314979,0.179144728553652,1.18973635991756,0.109533325237919
+"RQ2","boredom","loop_typechallenging:checkpointself_handling","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id)",1.45716207586525,0.380184077967356,5.58498221885622,0.582856971675662
+"RQ3","pleasure","loop_typechallenging:checkpointpost_feedback","Linear mixed model","(1 + challenge + pf || participant_id) + (1 | loop_id)",0.0454545454545249,-0.224000946258708,0.314910037167758,0.740216429027247
+"RQ3","arousal","loop_typechallenging:checkpointpost_feedback","Linear mixed model","(1 | participant_id) + (1 | loop_id)",-0.095959595959596,-0.380359497898174,0.188440305978982,0.507493898854852
+"RQ3","dominance","loop_typechallenging:checkpointpost_feedback","Linear mixed model","(1 + challenge + pf || participant_id) + (1 | loop_id)",0.393939393939412,0.139164623542395,0.648714164336429,0.0025405822976263
+"RQ3","confusion","loop_typechallenging:checkpointpost_feedback","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id) + (1 | loop_id)",0.290246219145238,0.138467167273306,0.608395978534227,0.0010528116690364
+"RQ3","frustration","loop_typechallenging:checkpointpost_feedback","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id) + (1 | loop_id)",0.628951552171507,0.235145238348486,1.68227967428665,0.355604947052392
+"RQ3","boredom","loop_typechallenging:checkpointpost_feedback","Ordinal mixed model (odds ratio)","(1 | participant_id) + (0 + challenge | participant_id) + (1 | loop_id)",2.77488533425455,0.569434446687875,13.5221686412687,0.206554052988451
+"RQ4","pleasure","function_classNR","Linear mixed model","(1 | participant_id)",-1.21212121212121,-1.7648547919151,-0.65938763232732,2.87599584984229e-05
+"RQ4","pleasure","function_classAR","Linear mixed model","(1 | participant_id)",0.227272727272729,-0.325460852521134,0.780006307066591,0.417391346472606
+"RQ4","pleasure","function_NRAR","Linear mixed model","(1 | participant_id)",1.43939393939394,0.886660359600017,1.99212751918786,9.46335524631057e-07
+"RQ4","pleasure","overall","Linear mixed model","(1 | participant_id)",NA,NA,NA,1.06072077703526e-06
+"RQ4","arousal","function_classNR","Linear mixed model","(1 | participant_id)",0.439393939393938,-0.0153143464761135,0.894102225263989,0.0581070974243983
+"RQ4","arousal","function_classAR","Linear mixed model","(1 | participant_id)",0.090909090909089,-0.363799194960865,0.545617376779043,0.693064259276343
+"RQ4","arousal","function_NRAR","Linear mixed model","(1 | participant_id)",-0.348484848484851,-0.803193134351478,0.106223437381776,0.131874487178819
+"RQ4","arousal","overall","Linear mixed model","(1 | participant_id)",NA,NA,NA,0.134585258832835
+"RQ4","dominance","function_classNR","Linear mixed model","(1 | participant_id)",-0.530303030303031,-0.995333232961078,-0.0652728276449842,0.0257414931248567
+"RQ4","dominance","function_classAR","Linear mixed model","(1 | participant_id)",0.0909090909090901,-0.374121111748925,0.555939293567106,0.699537864651715
+"RQ4","dominance","function_NRAR","Linear mixed model","(1 | participant_id)",0.621212121212119,0.156181887119238,1.086242355305,0.00923829447516452
+"RQ4","dominance","overall","Linear mixed model","(1 | participant_id)",NA,NA,NA,0.0192291967058645
+"RQ4","confusion","function_classNR","Ordinal mixed model (odds ratio)","(1 | participant_id)",1.87918896959177,0.916137781586583,3.85460708466769,0.0852429931686845
+"RQ4","confusion","function_classAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",1.93296611754327,0.943795607599311,3.95886353092307,0.0715689069056779
+"RQ4","confusion","function_NRAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",1.02861725570028,0.517604717819024,2.0441341090989,0.935818571182928
+"RQ4","confusion","overall","Ordinal mixed model (odds ratio)","(1 | participant_id)",NA,NA,NA,0.124903806915515
+"RQ4","frustration","function_classNR","Ordinal mixed model (odds ratio)","(1 | participant_id)",1.71771049661367,0.720260934100023,4.09647283433954,0.222464265712859
+"RQ4","frustration","function_classAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",0.54578129125434,0.214361705217999,1.38960089713936,0.204096279867542
+"RQ4","frustration","function_NRAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",0.317737630400575,0.126624809833977,0.797294005060631,0.0145813849397384
+"RQ4","frustration","overall","Ordinal mixed model (odds ratio)","(1 | participant_id)",NA,NA,NA,0.0440238373033468
+"RQ4","boredom","function_classNR","Ordinal mixed model (odds ratio)","(1 | participant_id)",8.98662250233875,0.902860049381704,89.448396852698,0.0610905311635443
+"RQ4","boredom","function_classAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",0.440176665919025,0.0416355149947615,4.65361115970266,0.495231647040268
+"RQ4","boredom","function_NRAR","Ordinal mixed model (odds ratio)","(1 | participant_id)",0.0489820322944884,0.0040272443713709,0.595752148728335,0.0179657972414131
+"RQ4","boredom","overall","Ordinal mixed model (odds ratio)","(1 | participant_id)",NA,NA,NA,0.023186321522805

@@ -1,0 +1,168 @@
+---
+title: "Model checks"
+subtitle: "How sure can we be about the answers to RQ1–RQ4?"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+  - R
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+A model's answer is only as good as the model. This page checks the models from RQ1–RQ4 in five ways.
+
+```{webr}
+#| caption: Setup
+#| edit: false
+suppressPackageStartupMessages({ library(lmerTest); library(ggplot2) })
+source("R/study_helpers.R")
+d       <- load_affect()
+results <- load_results()
+checks  <- load_checks()
+```
+
+::: {.callout-note}
+## Where these results come from
+
+The ordinal models take minutes to fit in a browser, so every model was fitted ahead of time with `R/fit_study_models.R` (in the [GitHub repository](https://github.com/pourya-shahverdi/hri-stats-tutorial/blob/main/R/fit_study_models.R)). It saved two files, which this page reads:
+
+- `data/study_results.csv`: the main result for each question and feeling
+- `data/study_checks.csv`: the same results from alternative versions of each model
+
+To refit everything yourself, open the project in RStudio and run `source("R/fit_study_models.R")`. It takes a few minutes.
+:::
+
+## 1. What each model includes
+
+Every model has three parts:
+
+| Part | What it does | Example |
+|------|--------------|---------|
+| **The comparison** | Answers the research question | `loop_type` (RQ1), `loop_type * checkpoint` (RQ2, RQ3), `function_class` (RQ4) |
+| **Design variables** | Keeps features of the study design from blurring the comparison | `pair_position`, `pb_order_group`, `feedback_condition` (`challenge_position` in RQ4) |
+| **Random effects** | Accounts for repeated reports from the same trainee and the same rehearsal | each trainee's own intercept and slope |
+
+**How the random effects were chosen.** Each model started with the richest structure: every trainee gets their own version of the effect being tested, and when two reports come from one rehearsal, that rehearsal gets its own intercept. If R could not estimate that structure (a "singular" fit, failed convergence or undefined standard errors), one piece was removed at a time. This "keep it as rich as the data allow" rule protects against too-small standard errors ([Chapter 3](03-mixed-models.qmd)).
+
+```{webr}
+#| caption: The random effects each model ended up with
+used <- unique(results[results$rq != "RQ4" & results$term != "overall",
+                       c("rq", "feeling", "random_effects")])
+rownames(used) <- NULL
+used
+```
+
+All RQ4 models use `(1 | participant_id)`: each trainee saw each function only once, so only a trainee intercept can be estimated.
+
+## 2. Residuals of the linear models
+
+A linear mixed model assumes the leftover errors (residuals) are roughly normal, with similar spread everywhere. Here are the RQ1 models for pleasure, arousal and dominance:
+
+```{webr}
+#| caption: Residual checks, RQ1 models
+#| fig-height: 8
+cb <- pick_reports(d, "child_behavior")
+par(mfrow = c(3, 2), mar = c(4, 4, 2, 1))
+for (v in sam_feelings) {
+  m <- lmer(as.formula(paste(v, "~ loop_type + pair_position + pb_order_group +",
+                             "feedback_condition + (1 + challenge | participant_id)")), data = cb)
+  plot(fitted(m), resid(m), pch = 19, col = adjustcolor("grey30", 0.4),
+       xlab = "Fitted value", ylab = "Residual", main = v)
+  abline(h = 0, lty = 2)
+  qqnorm(resid(m), pch = 19, col = adjustcolor("grey30", 0.4), main = paste(v, "(Q-Q)"))
+  qqline(resid(m))
+}
+```
+
+- **Diagonal stripes in the left plots** are expected: the ratings are whole numbers from −4 to +4, so each stripe is one rating value.
+- **The right plots bend away from the line at the ends**, most for arousal. For pleasure, part of this is the ceiling: many baseline ratings are already +4 and can't go higher.
+
+So the normal assumption is only roughly met. Check 3 tests whether that matters.
+
+## 3. Would an ordinal model say the same?
+
+The −4 to +4 ratings are really 9 ordered categories, so we also fitted each pleasure, arousal and dominance model as an **ordinal** model. The two kinds of model use different units (SAM points vs odds ratios), so we compare the **direction** and whether p is below .05.
+
+```{webr}
+#| caption: Linear vs ordinal model for the SAM feelings
+main <- results[results$feeling %in% sam_feelings & results$term != "overall",
+                c("rq", "feeling", "term", "estimate", "p")]
+ord  <- checks[checks$version == "as_ordinal", c("rq", "feeling", "term", "estimate", "p")]
+both <- merge(main, ord, by = c("rq", "feeling", "term"), suffixes = c("_linear", "_ordinal"))
+both$same_direction <- sign(both$estimate_linear) == sign(log(both$estimate_ordinal))
+both$same_verdict   <- (both$p_linear < 0.05) == (both$p_ordinal < 0.05)
+both[, c("estimate_linear", "estimate_ordinal")] <- round(both[, c("estimate_linear", "estimate_ordinal")], 2)
+both[, c("p_linear", "p_ordinal")] <- signif(both[, c("p_linear", "p_ordinal")], 2)
+both$term <- term_label(both$term)
+both
+```
+
+Every result points in the same direction. Only one changes verdict: the RQ3 dominance result (the gap shrinking after feedback) has p = .003 in the linear model but p = .053 in the ordinal model, so it's a little less certain than it looks.
+
+## 4. The ordinal models' key assumption
+
+An ordinal model assumes a predictor shifts the answers **the same amount at every cut-point**: from "not at all" to "a little" as much as from "moderate" to "strong". This is called **proportional odds**. The test below (`nominal_test()` from the `ordinal` package, on a version of each model without random effects) looks for signs that this fails. A p-value above .05 means no sign of a problem.
+
+```{webr}
+#| caption: Proportional-odds check for confusion, frustration, boredom
+po <- checks[checks$version == "proportional_odds", c("rq", "feeling", "p")]
+po <- po[!duplicated(po[, c("rq", "feeling")]), ]
+po$p <- signif(po$p, 2)
+po$result <- ifelse(is.na(po$p), "could not be checked (too few high answers)",
+                    ifelse(po$p < 0.05, "possible problem", "no sign of a problem"))
+rownames(po) <- NULL
+po
+```
+
+No checked model shows a problem. Some couldn't be checked, because there were too few answers in the higher categories to fit the test.
+
+## 5. Order and design
+
+Each RQ page has a **What about order?** table. It compares the main model with three versions: without the design variables, with a steady trend across the session instead of pair position, and without the 5 trainees whose rehearsals were not run in the planned order. Here is every result that **changes verdict** (p crosses .05) in at least one version:
+
+```{webr}
+#| caption: Results that are sensitive to how order is handled
+versions <- checks[checks$version %in% c("no_design", "trend", "in_order_only"), ]
+main <- results[results$term != "overall", c("rq", "feeling", "term", "p")]
+cmp  <- merge(versions, main, by = c("rq", "feeling", "term"), suffixes = c("", "_main"))
+cmp$changes <- (cmp$p < 0.05) != (cmp$p_main < 0.05)
+sensitive <- cmp[cmp$changes, c("rq", "feeling", "term", "version", "p_main", "p")]
+sensitive[, c("p_main", "p")] <- signif(sensitive[, c("p_main", "p")], 2)
+sensitive$term <- term_label(sensitive$term)
+rownames(sensitive) <- NULL
+sensitive
+
+c(results_checked = nrow(main), results_that_change = length(unique(paste(sensitive$rq, sensitive$feeling, sensitive$term))))
+```
+
+Almost every result keeps its verdict. The ones that change were already flagged as uncertain on their pages: boredom in RQ1, and arousal (NR vs PR) in RQ4, which sits right at p ≈ .05.
+
+## 6. What no model can fix
+
+Some limits come from the design itself, and statistics can't remove them:
+
+- **Baseline always came first.** In every pair, the baseline rehearsal came before the challenging one. Models can adjust for steady drift, but not fully separate order from the challenge.
+- **Function and task go together.** Each challenging behavior was shown during a different teaching task.
+- **No group without feedback.** Every rehearsal had trainer feedback, and PF was asked later with broader wording. So we can describe how feelings after feedback differ, but not prove the feedback caused it.
+- **Feedback style was assigned by alternation**, not at random.
+- **Many tests.** With 6 feelings and 4 questions, a few p-values near .05 can be false alarms ([Chapter 1](01-basics.qmd)).
+
+## Summary
+
+| Question | Main findings | How solid |
+|----------|---------------|-----------|
+| RQ1 | Less pleasure and control; more arousal, confusion, frustration | Solid in every check |
+| | Less boredom | Sensitive to how order is handled |
+| RQ2 | Pleasure, dominance, arousal and confusion gaps shrink in the SH report | Solid in every check |
+| RQ3 | Dominance and confusion gaps shrink after feedback | Solid; dominance less certain in the ordinal version |
+| RQ4 | NR least pleasant, least sense of control | Solid in every check |
+| | Frustration and boredom differences | Weak: rare answers and many tests |
