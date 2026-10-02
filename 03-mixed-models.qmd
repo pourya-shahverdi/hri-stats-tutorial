@@ -1,0 +1,291 @@
+---
+title: "3. Linear mixed models"
+subtitle: "Using every measurement while remembering who it came from"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - lme4
+        - lmerTest
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## In this chapter you will learn to
+
+- see a t-test as a **straight line** (a regression)
+- tell **fixed effects** from **random effects**
+- fit a mixed model with a **random intercept** and a **random slope**
+- read the output and answer the study's questions
+:::
+
+We continue with the 5-session study from [Chapter 2](02-repeated-measures.qmd): 30 people, 15 per robot, each rating their trust after 5 weekly sessions.
+
+```{webr}
+#| caption: Load and prepare the data
+#| edit: false
+library(ggplot2)
+suppressPackageStartupMessages(library(lmerTest))  # also loads lme4
+
+sessions <- read.csv("data/robot_sessions.csv")
+
+# Make "neutral" the comparison group
+sessions$robot <- factor(sessions$robot, levels = c("neutral", "expressive"))
+
+# time = 0 at the first session, 4 at the last
+sessions$time <- sessions$session - 1
+```
+
+We use `time = session - 1` so that **0 means the first session**. That makes the numbers in the output easier to read.
+
+## Step 1: a t-test is a straight line
+
+A t-test can be written as a **linear model**: predicted trust = a starting value + a difference for the expressive robot. Here it is on the 30 person-averages from Chapter 2:
+
+```{webr}
+#| caption: The same test, two ways
+person_means <- aggregate(trust ~ participant_id + robot, data = sessions, FUN = mean)
+
+summary(lm(trust ~ robot, data = person_means))$coefficients
+t.test(trust ~ robot, data = person_means, var.equal = TRUE)$p.value
+```
+
+- **(Intercept) = 55.7:** the average for the neutral robot (the comparison group).
+- **robotexpressive = 7.5:** how much higher the expressive robot's average is.
+
+The p-value for `robotexpressive` matches the t-test (the version that assumes equal variances). So a linear model *contains* the t-test, and we can now add more to it.
+
+## Step 2: add time
+
+Time is a number, so it gets a **slope**: how much trust changes per session.
+
+```{webr}
+#| caption: A line through all 150 ratings
+#| fig-height: 4
+line_fit <- lm(trust ~ time, data = sessions)
+coef(line_fit)
+
+plot(sessions$time, sessions$trust, pch = 19, col = "grey60",
+     xlab = "Time (sessions after the first)", ylab = "Trust (0-100)")
+abline(line_fit, lwd = 3, col = "steelblue")
+```
+
+On average, trust starts at about 51 and rises about 4.2 points per session. But `lm()` treats the 150 ratings as 150 people, the same mistake as in Chapter 2. We need to tell the model which ratings belong together.
+
+## Step 3: each person gets their own starting point
+
+A **random intercept** gives every person their own starting level, while they all share the same average slope. In R's `lme4` package, `(1 | participant_id)` means *"let the intercept (1) vary by participant"*.
+
+```{webr}
+#| caption: Random intercept model
+m_intercept <- lmer(trust ~ time + (1 | participant_id), data = sessions)
+summary(m_intercept)
+```
+
+The output has two parts:
+
+- **Fixed effects:** the **average** line, intercept ≈ 51 and slope ≈ 4.2 per session. Same estimates as before, but now with honest standard errors.
+- **Random effects:** how much people **vary** around that average line. People's starting levels have an SD of about **10 points**. What's left over after that, the session-to-session noise (`Residual`), has an SD of about **6 points**.
+
+See what the model fitted for each person:
+
+```{webr}
+#| caption: One fitted line per person
+#| fig-height: 4
+sessions$fit_intercept <- fitted(m_intercept)
+
+ggplot(sessions, aes(session, trust, group = participant_id)) +
+  geom_point(colour = "grey60", size = 1) +
+  geom_line(aes(y = fit_intercept), colour = "steelblue") +
+  labs(x = "Session", y = "Trust (0-100)") +
+  theme_minimal()
+```
+
+The lines are **parallel**: each person has their own height, but they all climb at the same rate.
+
+How much of the variation comes from differences *between* people? This share is called the **intraclass correlation (ICC)**:
+
+```{webr}
+#| caption: Intraclass correlation
+variances <- as.data.frame(VarCorr(m_intercept))$vcov   # person, residual
+variances[1] / sum(variances)
+```
+
+About 73% of the variation in trust is about *who* is rating, not *when*. That is why ignoring the person mattered so much in Chapter 2.
+
+::: {.callout-important}
+## Fixed effects vs random effects
+
+**Fixed effects** are what you want to learn about and report: the average starting trust, how fast trust grows, the difference between robots. They are the same for everyone.
+
+**Random effects** describe how individuals **differ** from the average. Our 30 participants are a sample from a much larger population. We don't care about participant S07 in particular; we want to *account for* the fact that people differ.
+
+A quick test: if you reran the study, would you use the same levels? **Robot** would still be neutral and expressive, so it's fixed. **Participants** would be new people, so they're random.
+:::
+
+## Step 4: each person warms up at their own speed
+
+Look back at the plot in Chapter 2: some people's trust climbed quickly, others barely changed. A **random slope** lets each person have their own rate of change. `(1 + time | participant_id)` means *"let both the intercept and the time slope vary by participant"*.
+
+```{webr}
+#| caption: Random intercept and random slope
+m_slope <- lmer(trust ~ time + (1 + time | participant_id), data = sessions)
+summary(m_slope)
+```
+
+People's slopes vary with an SD of about **1.8 points per session** around the average of 4.2. The lines now fan out:
+
+```{webr}
+#| caption: Each person's own line
+#| fig-height: 4
+sessions$fit_slope <- fitted(m_slope)
+
+ggplot(sessions, aes(session, trust, group = participant_id)) +
+  geom_point(colour = "grey60", size = 1) +
+  geom_line(aes(y = fit_slope), colour = "steelblue") +
+  labs(x = "Session", y = "Trust (0-100)") +
+  theme_minimal()
+```
+
+Does letting slopes vary improve the model enough to keep it? Compare the two models:
+
+```{webr}
+#| caption: Compare the two models
+anova(m_intercept, m_slope, refit = FALSE)
+```
+
+The test is significant (p = 0.03), so we keep the random slope.
+
+## Step 5: answer the study's questions
+
+Now we put it all together. `robot * time` includes the robot difference, the time slope, and their **interaction**: whether the slope differs between robots.
+
+```{webr}
+#| caption: The full model
+m_full <- lmer(trust ~ robot * time + (1 + time | participant_id), data = sessions)
+summary(m_full)
+```
+
+Read the **fixed effects** row by row. Remember: neutral is the comparison group, and time = 0 is the first session.
+
+| Row | Estimate | What it means |
+|-----|----------|---------------|
+| `(Intercept)` | 49.5 | Neutral robot, first session: average trust |
+| `robotexpressive` | 3.1 (p = .48) | Expressive vs neutral **at the first session**: no clear difference |
+| `time` | 3.1 (p < .001) | Neutral robot: trust rises about 3 points per session |
+| `robotexpressive:time` | 2.2 (p = .013) | Expressive robot: trust rises 2.2 points **more** per session, so about 5.3 |
+
+So the robots start out about the same, but trust **grows faster** with the expressive robot. The p-values come from the `lmerTest` package, which adds them to `lme4`'s output.
+
+A picture of the two average lines (the fixed effects) over the data:
+
+```{webr}
+#| caption: The model's average line for each robot
+#| fig-height: 4
+grid <- expand.grid(time = 0:4, robot = c("neutral", "expressive"))
+grid$predicted <- predict(m_full, newdata = grid, re.form = NA)  # NA = average person
+
+ggplot(sessions, aes(time + 1, trust, colour = robot)) +
+  geom_jitter(width = 0.1, alpha = 0.4) +
+  geom_line(data = grid, aes(y = predicted), linewidth = 1.5) +
+  labs(x = "Session", y = "Trust (0-100)", colour = "Robot") +
+  theme_minimal()
+```
+
+## Why not just use `lm()`?
+
+Here are the standard errors from the full model and from the same model fitted with `lm()`, which ignores who each rating came from:
+
+```{webr}
+#| caption: Standard errors, wrong vs right
+naive <- lm(trust ~ robot * time, data = sessions)
+
+round(cbind(lm_ignores_people = coef(summary(naive))[, "Std. Error"],
+            mixed_model       = coef(summary(m_full))[, "Std. Error"]), 2)
+```
+
+- For **robot**, which differs *between* people, `lm()`'s standard error is **too small**. It is overconfident, just like the t-test on 150 ratings.
+- For **time**, which changes *within* each person, the mixed model's standard error is **smaller**. Like the paired t-test, comparing each person with themselves removes noise.
+
+A mixed model is not simply "more cautious". It puts the uncertainty in the right place.
+
+## Checking the model
+
+Two quick checks:
+
+```{webr}
+#| caption: Residual checks
+#| fig-height: 4
+par(mfrow = c(1, 2))
+plot(fitted(m_full), resid(m_full), pch = 19, col = "grey50",
+     xlab = "Fitted value", ylab = "Residual")
+abline(h = 0, lty = 2)
+qqnorm(resid(m_full), pch = 19, col = "grey50"); qqline(resid(m_full))
+```
+
+- **Left:** residuals should look like a shapeless cloud around 0, with no curve or funnel.
+- **Right:** points should fall close to the line if the residuals are roughly normal.
+
+If R ever says **`boundary (singular) fit`**, a random effect was estimated as zero or a correlation as ±1. The model is too complex for the data. Simplify it, for example by removing the random slope.
+
+**Writing it up:** *We fitted a linear mixed model of trust with robot, session and their interaction as fixed effects, and a random intercept and slope for session by participant. Trust rose by 3.1 points per session with the neutral robot (p < .001), and by 2.2 points more per session with the expressive robot (p = .013). The robots did not differ clearly at the first session (3.1 points, p = .48).*
+
+## Try it
+
+Fit the full model with a **random intercept only**, then compare its `robotexpressive:time` estimate and standard error with `m_full`.
+
+```{webr}
+#| exercise: ex_lmm
+#| autorun: false
+m_try <- lmer(trust ~ robot * time + (______ | participant_id), data = sessions)
+summary(m_try)$coefficients
+```
+
+::: {.hint exercise="ex_lmm"}
+A random intercept only is written `(1 | participant_id)`.
+:::
+
+::: {.solution exercise="ex_lmm"}
+```r
+m_try <- lmer(trust ~ robot * time + (1 | participant_id), data = sessions)
+```
+
+The interaction estimate is the same (2.2), but its standard error is smaller. Without random slopes, the model assumes everyone changes at the same rate, so it is overconfident about differences in slopes. When people really do differ in their slopes, include the random slope.
+:::
+
+## Check your understanding
+
+::: {.callout-note collapse="true"}
+## What does `(1 + time | participant_id)` mean in words?
+
+Each participant gets their own intercept (starting level) and their own slope for time (rate of change).
+:::
+
+::: {.callout-note collapse="true"}
+## Why is participant a random effect but robot a fixed effect?
+
+The participants are a sample of people. A new study would use different people, and we want to generalize beyond them. The robots are the specific conditions we chose and want to compare.
+:::
+
+::: {.callout-note collapse="true"}
+## The `robotexpressive` row has p = .48 but the interaction has p = .013. Do the robots differ?
+
+Not at the first session, which is what `robotexpressive` measures when time = 0. They do differ in how fast trust grows, and so the gap widens over time.
+:::
+
+## Key points
+
+- A **linear model** is a line: an intercept plus slopes. A t-test is the simplest case.
+- A **linear mixed model** adds **random effects**: each person can have their own intercept and slope.
+- **Fixed effects** answer your research questions. **Random effects** capture how people differ.
+- An **interaction** asks whether one effect (time) depends on another (robot).
+- Mixed models put uncertainty in the right place: honest for between-person effects, more precise for within-person effects.
+
+**Next:** [Chapter 4](04-ordinal.qmd) asks what to do when the outcome is a rating scale like "strongly disagree" to "strongly agree".

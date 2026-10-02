@@ -1,43 +1,39 @@
 ---
 title: "HRI Statistics Tutorial"
-subtitle: "From t-tests to ordinal mixed models, using data shaped like a human–robot interaction study"
+subtitle: "From comparing two groups to mixed models, with simple human–robot interaction examples"
 format: live-html
 toc: false
 ---
 
-This tutorial teaches the statistical methods used in a human–robot interaction study of how trainees felt during rehearsals with a simulated child. Each module starts from something you already know and adds one idea. The R code runs in your browser, so you don't need to install anything.
+This tutorial introduces the statistics behind many human–robot interaction (HRI) studies. It starts from the basics and builds up one idea at a time, using small made-up studies about how much people trust a robot. You can run and edit every piece of R code in your browser, with nothing to install.
 
-::: {.callout-warning}
-## Under construction
+## Chapters
 
-The modules are being written. Start with the [browser check](webr-check.qmd) to confirm your browser can run the models.
-:::
+| | Chapter | The question it answers |
+|---|---------|------------------------|
+| 1 | [Comparing two groups](01-basics.qmd) | Do people trust an expressive robot more than a neutral one? *Mean, variance, the normal distribution, p and alpha, the t-test.* |
+| 2 | [Same people, many measurements](02-repeated-measures.qmd) | What goes wrong when each person is measured several times? *Independence, pseudo-replication, the paired t-test.* |
+| 3 | [Linear mixed models](03-mixed-models.qmd) | Does trust grow over sessions, and faster with one robot? *Fixed and random effects, random intercepts and slopes, interactions.* |
+| 4 | [When the outcome is a rating scale](04-ordinal.qmd) | What if people answer "strongly disagree" to "strongly agree"? *Ordinal regression, odds ratios, ordinal mixed models.* |
 
-## Modules
+Work through the chapters in order. Each one ends with a short exercise and self-check questions.
 
-| # | Topic | Key idea |
-|---|-------|----------|
-| 1 | Paired t-test | Compare each participant with themselves |
-| 2 | Pseudo-replication | 396 ratings from 66 people are not 396 independent observations |
-| 3 | Tests are linear models | A paired t-test is `lm(difference ~ 1)` |
-| 4 | Random intercepts | Partial pooling and the intraclass correlation |
-| 5 | Random slopes | People differ in how much the challenge affects them |
-| 6 | Inference and diagnostics | Kenward–Roger tests, adjustment variables, ceiling effects |
-| 7 | Ordinal regression | Thresholds on a latent scale, and what an odds ratio means |
-| 8 | Ordinal mixed models | `clmm`, conditional odds ratios, convergence |
-| 9 | Interactions and contrasts | Difference-in-differences with `emmeans`, multiplicity |
+## The example studies
 
-## The data
+All data are **simulated**, so no real participants are involved.
 
-All examples use **simulated** data that copy the study's design but contain no participant data:
+- **Chapter 1:** 40 visitors each meet one robot, neutral or expressive, once, and rate their trust from 0 to 100. [Download](data/robot_one_visit.csv)
+- **Chapters 2–4:** 30 people each meet the same robot in 5 weekly sessions. After each session they rate trust from 0 to 100 and answer *"I would trust this robot to help me"* from 1 (strongly disagree) to 5 (strongly agree). [Download](data/robot_sessions.csv)
 
-- 66 participants, each completing 3 baseline and 3 challenging rehearsals
-- after every rehearsal, three reports: feelings about the child's behavior (CB), about their own handling (SH), and overall after trainer feedback (PF)
-- Self-Assessment Manikin ratings of pleasure, arousal and dominance (−4 to +4)
-- confusion, frustration and boredom ratings (1 to 5)
+The code that creates the data is in the [GitHub repository](https://github.com/pourya-shahverdi/hri-stats-tutorial/blob/main/R/simulate_tutorial_data.R).
 
-[Download the CSV](data/affect_sim.csv) · [See the simulation code](https://github.com/pourya-shahverdi/hri-stats-tutorial/blob/main/R/simulate_affect.R)
+## Using the code boxes
 
-## Running the code
+- Code boxes run on their own when the page loads. Press **Run Code** after you edit one, and **Start Over** to bring back the original.
+- **Try it** boxes have blanks (`______`) to fill in. Use **Hint** and **Solution** if you get stuck.
+- The first page you open downloads R into your browser, which can take a minute. Later pages are faster.
+- If code doesn't run, try the [browser check](webr-check.qmd) page or a different browser (Chrome, Edge or Firefox work well).
 
-Code boxes have a **Run Code** button. You can edit the code and run it again; **Start Over** restores the original. The first page that runs R downloads it into your browser, which can take a minute.
+## What comes next
+
+After these chapters, the tutorial applies the same tools to a real study design: how trainees' feelings change during rehearsals with a robot.

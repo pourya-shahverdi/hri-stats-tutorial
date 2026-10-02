@@ -1,0 +1,235 @@
+---
+title: "2. Same people, many measurements"
+subtitle: "Why a t-test is not enough when people are measured repeatedly"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## In this chapter you will learn to
+
+- recognize **repeated measures**: several measurements from the same person
+- explain why repeated measurements are **not independent**
+- see how a t-test on all the measurements gives **misleading** p-values
+- use two valid shortcuts, and see what they can't answer
+:::
+
+## The new study
+
+Trust can change as people get to know a robot. To study that, the lab runs a longer study:
+
+- 30 people take part. 15 are assigned to the **neutral** robot and 15 to the **expressive** robot.
+- Each person meets **their** robot once a week for **5 sessions**.
+- After every session, they rate their trust from 0 to 100.
+
+That gives 30 people × 5 sessions = **150 ratings**, but still only **30 people**.
+
+```{webr}
+#| caption: Load the data
+sessions <- read.csv("data/robot_sessions.csv")
+sessions$robot <- factor(sessions$robot, levels = c("neutral", "expressive"))
+head(sessions, 10)
+
+nrow(sessions)                          # number of ratings
+length(unique(sessions$participant_id)) # number of people
+```
+
+(Ignore the `agree` column for now. We'll use it in Chapter 4.)
+
+## Look at each person
+
+Each line below is one person across their five sessions.
+
+```{webr}
+#| caption: One line per person
+#| fig-height: 4
+library(ggplot2)
+ggplot(sessions, aes(session, trust, group = participant_id)) +
+  geom_line(alpha = 0.5) +
+  geom_point(size = 1) +
+  facet_wrap(~ robot) +
+  labs(x = "Session", y = "Trust (0-100)") +
+  theme_minimal()
+```
+
+Two things stand out:
+
+1. **People start at different levels.** Some people trust robots more in general.
+2. **Trust tends to rise** across sessions as people get used to the robot.
+
+The first point is the important one for this chapter. If you know someone's rating in session 1, you can make a good guess about their rating in session 2. Their ratings are related:
+
+```{webr}
+#| caption: Session 1 vs session 2, same people
+s1 <- sessions$trust[sessions$session == 1]
+s2 <- sessions$trust[sessions$session == 2]
+plot(s1, s2, pch = 19, xlab = "Trust in session 1", ylab = "Trust in session 2")
+cor(s1, s2)
+```
+
+A correlation of about 0.8 is strong. Ratings from the same person are **not independent**, and independence was the first thing the t-test relied on.
+
+## The mistake: treating 150 ratings as 150 people
+
+Suppose we ask, "Do people trust the expressive robot more?" and simply run a t-test on all 150 ratings:
+
+```{webr}
+#| caption: The wrong way
+t.test(trust ~ robot, data = sessions)
+```
+
+The p-value is tiny (p = 0.0004). But the t-test believes it has 150 separate people. It really has 30 people, each counted five times. Five ratings from one person tell you much less than five ratings from five different people, because the person's general attitude repeats in every rating.
+
+So the t-test works out a standard error that is too small, and a p-value that is too small.
+
+## How bad is it?
+
+Let's build pretend studies where the robot makes **no difference at all**: people differ from each other, but the robot type doesn't matter. Then we test each one two ways, with α = 0.05:
+
+- **All 150 ratings:** the mistake above.
+- **One mean per person:** average each person's five ratings first, then test those 30 averages.
+
+```{webr}
+#| caption: 500 studies where the robot does nothing
+one_null_study <- function() {
+  id     <- rep(1:30, each = 5)
+  robot  <- rep(c("neutral", "expressive"), each = 75)
+  person <- rnorm(30, mean = 0, sd = 10)[id]   # each person's own level
+  trust  <- 50 + person + rnorm(150, sd = 6)   # no robot effect at all
+  d <- data.frame(id, robot, trust)
+  per_person <- aggregate(trust ~ id + robot, data = d, FUN = mean)
+
+  c(all_150_ratings     = t.test(trust ~ robot, data = d)$p.value < 0.05,
+    one_mean_per_person = t.test(trust ~ robot, data = per_person)$p.value < 0.05)
+}
+
+set.seed(3)
+false_alarms <- replicate(500, one_null_study())
+rowMeans(false_alarms)   # share of studies called "significant"
+```
+
+With α = 0.05 we promised a false-alarm rate of 5%. Counting every rating as a separate person gives roughly **30%** false alarms. Using one mean per person keeps it near the promised 5%. This mistake is called **pseudo-replication**: treating repeated measurements as if they were new people.
+
+## Valid shortcut 1: one number per person
+
+Averaging each person's five ratings gives 30 values, one per person, so the t-test's independence assumption holds again.
+
+```{webr}
+#| caption: Average first, then test
+person_means <- aggregate(trust ~ participant_id + robot, data = sessions, FUN = mean)
+nrow(person_means)
+
+t.test(trust ~ robot, data = person_means)
+```
+
+Now p = 0.048. That is still below 0.05, but far less certain than the misleading p = 0.0004. This analysis is valid, but it threw away everything about *when* each rating happened.
+
+## Valid shortcut 2: same people twice, the paired t-test
+
+Did trust change from the first session to the last? Now we compare **the same people at two times**. The **paired t-test** handles this: it works out each person's change (last minus first) and tests whether the average change differs from zero. Each person is compared with themselves, so their general level of trust cancels out.
+
+```{webr}
+#| caption: First vs last session, same people
+first <- sessions$trust[sessions$session == 1]
+last  <- sessions$trust[sessions$session == 5]   # same order of people
+
+t.test(last, first, paired = TRUE)
+
+# The same thing: a one-sample t-test on each person's change
+t.test(last - first)
+```
+
+Trust rose by about 17 points on average, t(29) = 9.04, p < .001. Compare this with an **unpaired** test of the same numbers:
+
+```{webr}
+#| caption: Paired vs unpaired
+c(paired   = unname(t.test(last, first, paired = TRUE)$statistic),
+  unpaired = unname(t.test(last, first)$statistic))
+```
+
+The paired t is larger. Removing the differences *between* people leaves less noise, so the change is easier to see.
+
+## What a t-test can't do
+
+Our real questions use the whole study:
+
+1. Does trust **grow across all five sessions**, not just from the first to the last?
+2. Do people trust the **expressive** robot more?
+3. Does trust **grow faster** with one robot than the other?
+
+A t-test compares two means. It can't use all five sessions at once, it can't treat session as a number on a timeline, it can't look at robot and session together, and it drops anyone with a missing session. We need a method that:
+
+- uses **all 150 ratings**,
+- knows **which ratings come from the same person**,
+- includes **session** and **robot** in one model.
+
+That method is the **linear mixed model**, the topic of [Chapter 3](03-mixed-models.qmd).
+
+::: {.callout-important}
+## Is the problem the *order* of the measurements?
+
+Not quite. The core problem is that measurements from the **same person are related**. That would be true even if all five ratings were collected at once, in random order.
+
+Order (or time) matters for a separate reason. If trust changes from session to session, through familiarity, practice or boredom, then **session is something we want to include in the analysis**. A t-test has no place to put it.
+
+A linear mixed model solves both: it accounts for related measurements from the same person, and it can include session as a predictor. When people experience several conditions in sequence, researchers also **counterbalance** the order (vary it across people) so that order effects don't get mixed up with condition effects.
+:::
+
+## Try it
+
+Fill in the blanks to compute each person's **average trust**, then compare the two robots. You should get 30 rows.
+
+```{webr}
+#| exercise: ex_means
+#| autorun: false
+my_means <- aggregate(trust ~ ______ + robot, data = sessions, FUN = ______)
+nrow(my_means)
+t.test(trust ~ robot, data = my_means)
+```
+
+::: {.hint exercise="ex_means"}
+Group by the column that identifies each person, and summarize with the function that computes an average.
+:::
+
+::: {.solution exercise="ex_means"}
+```r
+my_means <- aggregate(trust ~ participant_id + robot, data = sessions, FUN = mean)
+```
+:::
+
+## Check your understanding
+
+::: {.callout-note collapse="true"}
+## 20 people each rate both robots once. Which test?
+
+A **paired t-test**: the same people are measured twice, once per robot. Each person is their own comparison.
+:::
+
+::: {.callout-note collapse="true"}
+## 20 people each rate one robot 10 times, and you run a t-test on all 200 ratings. What's wrong?
+
+The t-test treats 200 ratings as 200 independent people. Ratings from the same person are related, so the standard error is too small and the p-value too small. This is pseudo-replication.
+:::
+
+::: {.callout-note collapse="true"}
+## Why does a paired t-test usually have more power than an unpaired one?
+
+It compares each person with themselves, which removes the large differences between people from the noise.
+:::
+
+## Key points
+
+- **Repeated measures** means several measurements from the same person. Those measurements are related, not independent.
+- Running a t-test on all the measurements (**pseudo-replication**) makes p-values far too small.
+- Two valid shortcuts: **average** per person, or a **paired t-test** for two measurements per person.
+- Neither shortcut can use every measurement, include time, and look at robot and time together. A **linear mixed model** can.

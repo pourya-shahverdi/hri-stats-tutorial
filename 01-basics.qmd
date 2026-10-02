@@ -1,0 +1,265 @@
+---
+title: "1. Comparing two groups"
+subtitle: "Mean, spread, the normal distribution, p-values and the t-test"
+format:
+  live-html:
+    webr:
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## In this chapter you will learn to
+
+- describe a group with its **mean** and **standard deviation**
+- read a **normal distribution**
+- explain what a **p-value** and **alpha** mean
+- run and read a **t-test**
+:::
+
+## The study
+
+A lab wants to know whether people trust an **expressive** robot (it smiles, nods and uses your name) more than a **neutral** robot (same words, no expressions).
+
+Forty visitors take part. Each person meets **one** robot, chats with it for five minutes, then answers *"How much do you trust this robot?"* on a slider from 0 to 100. Because each person sees only one robot, this is called a **between-subjects** design.
+
+```{webr}
+#| caption: Load the data
+visits <- read.csv("data/robot_one_visit.csv")
+head(visits)
+```
+
+Each row is one person. The code boxes on this page run in your browser: edit any of them and press **Run Code**. **Start Over** brings the original code back.
+
+## The mean: the typical value
+
+The **mean** is the sum of all values divided by how many values there are:
+
+$$\bar{x} = \frac{x_1 + x_2 + \dots + x_n}{n}$$
+
+```{webr}
+#| caption: Group means
+neutral    <- visits$trust[visits$robot == "neutral"]
+expressive <- visits$trust[visits$robot == "expressive"]
+
+mean(neutral)
+mean(expressive)
+mean(expressive) - mean(neutral)
+```
+
+The expressive group's mean is about 12 points higher. Is that a real difference, or could two groups differ this much just by luck? To answer that, we first need to know how much people's ratings **vary**.
+
+## Variance and standard deviation: how spread out
+
+Two groups can have the same mean but very different spread. The **variance** is the average squared distance from the mean:
+
+$$s^2 = \frac{\sum (x_i - \bar{x})^2}{n - 1}$$
+
+The **standard deviation** (SD) is the square root of the variance. It is easier to read because it is in the same units as the data: trust points.
+
+```{webr}
+#| caption: Spread
+var(neutral)
+sd(neutral)
+sd(expressive)
+
+boxplot(trust ~ robot, data = visits, col = c("#92c5de", "#f4a582"),
+        ylab = "Trust (0-100)", xlab = "")
+stripchart(trust ~ robot, data = visits, vertical = TRUE,
+           method = "jitter", add = TRUE, pch = 19)
+```
+
+The SDs are about 11 to 13 points: most people sit within roughly 12 points of their group's mean. The two groups overlap a lot, even though their means differ by about one SD. Keep that in mind: a difference in means does not mean everyone in one group scored higher.
+
+## The normal distribution
+
+Many measurements pile up around the mean and thin out evenly on both sides, making a bell-shaped curve called the **normal distribution**. Two numbers describe it completely: the **mean** sets its center and the **SD** sets its width.
+
+A useful rule of thumb: about **68%** of values fall within 1 SD of the mean, and about **95%** within 2 SDs.
+
+Move the sliders and watch the curve change.
+
+```{ojs}
+//| echo: false
+viewof mu = Inputs.range([20, 80], {value: 55, step: 1, label: "Mean"})
+viewof sigma = Inputs.range([4, 25], {value: 12, step: 1, label: "Standard deviation"})
+```
+
+```{webr}
+#| caption: A normal distribution
+#| input:
+#|   - mu
+#|   - sigma
+#| runbutton: false
+#| startover: false
+#| fig-height: 4
+curve(dnorm(x, mu, sigma), from = 0, to = 100, lwd = 2, n = 300,
+      ylim = c(0, 0.1), xlab = "Trust (0-100)", ylab = "How common")
+xs <- seq(mu - sigma, mu + sigma, length.out = 200)
+polygon(c(xs, rev(xs)), c(dnorm(xs, mu, sigma), rep(0, 200)),
+        col = adjustcolor("steelblue", 0.35), border = NA)
+abline(v = mu, lty = 2)
+title(sprintf("About 68%% of people fall between %d and %d", mu - sigma, mu + sigma))
+```
+
+Real data are never perfectly normal, especially in small groups. Here are our neutral-robot ratings:
+
+```{webr}
+#| caption: Is our data roughly normal?
+#| fig-height: 4
+hist(neutral, breaks = 8, col = "grey85", main = "Neutral robot", xlab = "Trust (0-100)")
+```
+
+Bumpy, but roughly one hill in the middle with no extreme values. That is close enough for the t-test below, which is fairly forgiving, especially as groups get larger.
+
+## Could it be luck? The null hypothesis
+
+Even if the robot made no difference at all, two random groups of 20 people would almost never have exactly the same mean. So we set up two competing ideas:
+
+- **Null hypothesis (H₀):** the robots earn the same average trust. Our 12-point difference is just luck.
+- **Alternative hypothesis (H₁):** the robots earn different average trust.
+
+We can see what luck alone produces. If the robot did not matter, the "neutral" and "expressive" labels would be meaningless, so we can **shuffle** them and recalculate the difference. Doing that 2,000 times shows the range of differences that luck produces:
+
+```{webr}
+#| caption: What differences does luck produce?
+#| fig-height: 4
+observed <- mean(expressive) - mean(neutral)
+
+set.seed(1)
+shuffled_diffs <- replicate(2000, {
+  fake_robot <- sample(visits$robot)   # shuffle the labels
+  mean(visits$trust[fake_robot == "expressive"]) -
+    mean(visits$trust[fake_robot == "neutral"])
+})
+
+hist(shuffled_diffs, breaks = 40, col = "grey85",
+     main = "Differences when the robot does not matter",
+     xlab = "Difference in mean trust (expressive - neutral)")
+abline(v = c(-observed, observed), col = "red", lwd = 2)
+
+# Share of shuffles at least as extreme as our real difference
+mean(abs(shuffled_diffs) >= abs(observed))
+```
+
+The red lines mark our real difference (and its mirror image). Luck almost never produces a gap that large: only about 0.35% of shuffles did. That last number is a **p-value**.
+
+## p-values and alpha
+
+**The p-value** answers one question: *if the null hypothesis were true, how often would we see a difference at least this big?* A small p-value means our result would be surprising if the robot made no difference.
+
+**Alpha (α)** is the cut-off you choose **before** looking at the data, usually **0.05**. If p < α, we reject the null hypothesis and call the result *statistically significant*.
+
+Alpha is also the false-alarm rate you agree to accept. With α = 0.05, when there truly is no effect, about 1 study in 20 will still give p < 0.05 by luck. Let's check by running 1,000 pretend studies where both robots have exactly the same true mean:
+
+```{webr}
+#| caption: 1,000 studies with no real difference
+#| fig-height: 4
+set.seed(2)
+p_values <- replicate(1000, {
+  group_a <- rnorm(20, mean = 55, sd = 12)
+  group_b <- rnorm(20, mean = 55, sd = 12)
+  t.test(group_a, group_b)$p.value
+})
+
+mean(p_values < 0.05)   # share of false alarms
+
+hist(p_values, breaks = 20, col = "grey85",
+     main = "p-values when there is NO real difference", xlab = "p-value")
+abline(v = 0.05, col = "red", lwd = 2)
+```
+
+About 5% of the studies came out "significant" even though nothing was going on. These false alarms are called **Type I errors**.
+
+::: {.callout-warning}
+## Three common mistakes
+
+1. **"p = 0.003 means there is a 0.3% chance the null hypothesis is true."** No. The p-value assumes the null is true and asks how surprising the data are.
+2. **"p > 0.05 proves there is no difference."** No. It means this study could not tell. A bigger study might.
+3. **"Significant means important."** No. Always look at the size of the difference too: 12 points on a 100-point scale.
+:::
+
+## The t-test
+
+The shuffle idea works, but there is a classic shortcut: the **t-test**. It divides the difference in means by its **standard error** (SE), which is how much the difference would wobble from sample to sample:
+
+$$t = \frac{\bar{x}_{expressive} - \bar{x}_{neutral}}{SE}, \qquad SE = \sqrt{\frac{s^2_{expressive}}{n_{expressive}} + \frac{s^2_{neutral}}{n_{neutral}}}$$
+
+A big t means the difference is large compared with the wobble. The SE gets smaller when people vary less, or when there are more people.
+
+```{webr}
+#| caption: t by hand, then with t.test()
+se <- sqrt(var(expressive) / 20 + var(neutral) / 20)
+c(difference = observed, se = se, t = observed / se)
+
+t.test(trust ~ robot, data = visits)
+```
+
+How to read the output:
+
+- **t = 3.20**: the difference is about 3 standard errors away from zero.
+- **df ≈ 37**: degrees of freedom, roughly the number of people minus 2. R's default (Welch's t-test) adjusts it slightly so the groups don't need equal variances.
+- **p-value = 0.003**: below α = 0.05, so we reject the null hypothesis. It also matches our shuffle result.
+- **95% confidence interval: 4.3 to 19.4**: the range of true differences that fit our data.
+
+A t-test relies on three things:
+
+1. **Independence:** each value comes from a different, unrelated person. *Chapter 2 is about what happens when this breaks.*
+2. **Roughly normal values** in each group. This matters less as groups get larger.
+3. **Numbers with equal steps:** the gap from 40 to 50 means the same as from 80 to 90. *Chapter 4 is about rating scales where this may not hold.*
+
+**Writing it up:** *Visitors trusted the expressive robot more (M = 61.6, SD = 10.7) than the neutral robot (M = 49.8, SD = 12.7), t(37.0) = 3.20, p = .003, a difference of 11.9 points, 95% CI [4.3, 19.4].*
+
+## Try it
+
+Fill in the blanks to run a t-test that compares trust between the two robots. Then try changing `20` to `5` in the false-alarm simulation above. Does the false-alarm rate change?
+
+```{webr}
+#| exercise: ex_ttest
+#| autorun: false
+t.test(______ ~ ______, data = visits)
+```
+
+::: {.hint exercise="ex_ttest"}
+The outcome goes on the left of `~` and the group column goes on the right.
+:::
+
+::: {.solution exercise="ex_ttest"}
+Use `t.test(trust ~ robot, data = visits)`.
+
+The false-alarm rate stays near 5% with any group size. Alpha does not depend on how many people you test. What changes with more people is your chance of detecting a real difference.
+:::
+
+## Check your understanding
+
+::: {.callout-note collapse="true"}
+## A study reports p = 0.03 with α = 0.05. What can you conclude?
+
+The difference is statistically significant. If there were truly no difference, a result this extreme would happen only about 3% of the time. It does **not** mean there is a 97% chance the effect is real.
+:::
+
+::: {.callout-note collapse="true"}
+## Group A has SD = 5 and group B has SD = 20, with the same mean. How do they differ?
+
+Group B is far more spread out. Its people disagree much more with each other, even though both groups have the same typical value.
+:::
+
+::: {.callout-note collapse="true"}
+## You test 100 robot features that have no real effect, using α = 0.05. How many will look significant?
+
+About 5, purely by luck.
+:::
+
+## Key points
+
+- The **mean** tells you the typical value; the **SD** tells you how much people differ from it.
+- The **normal distribution** is described by its mean and SD; about 95% of values fall within 2 SDs.
+- The **p-value** is how surprising your data would be if there were no real effect. **Alpha** is the cut-off you choose in advance, and the false-alarm rate you accept.
+- The **t-test** compares two means relative to their standard error. It assumes each value comes from a different person.
+
+**Next:** [Chapter 2](02-repeated-measures.qmd) asks what happens when the same people are measured again and again.

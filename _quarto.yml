@@ -3,27 +3,45 @@ project:
   output-dir: _site
   render:
     - index.qmd
+    - 01-basics.qmd
+    - 02-repeated-measures.qmd
+    - 03-mixed-models.qmd
+    - 04-ordinal.qmd
     - webr-check.qmd
 
 website:
   title: "HRI Statistics Tutorial"
-  description: "From t-tests to ordinal mixed models, with runnable R in the browser."
+  description: "From comparing two groups to mixed models, with runnable R in the browser."
   site-url: https://pourya-shahverdi.github.io/hri-stats-tutorial/
   repo-url: https://github.com/pourya-shahverdi/hri-stats-tutorial
   repo-actions: [issue]
   page-navigation: true
   navbar:
-    left:
-      - href: index.qmd
-        text: Home
-      - href: webr-check.qmd
-        text: Browser check
     right:
       - text: "Pourya Shahverdi"
         href: https://pourya-shahverdi.github.io/
       - icon: github
         href: https://github.com/pourya-shahverdi/hri-stats-tutorial
         aria-label: GitHub repository
+  sidebar:
+    style: docked
+    contents:
+      - href: index.qmd
+        text: Home
+      - section: "Chapters"
+        contents:
+          - href: 01-basics.qmd
+            text: "1. Comparing two groups"
+          - href: 02-repeated-measures.qmd
+            text: "2. Same people, many measurements"
+          - href: 03-mixed-models.qmd
+            text: "3. Linear mixed models"
+          - href: 04-ordinal.qmd
+            text: "4. Rating-scale outcomes"
+      - section: "Help"
+        contents:
+          - href: webr-check.qmd
+            text: Browser check
   page-footer:
     center: "All data on this site are simulated. Built with [Quarto Live](https://r-wasm.github.io/quarto-live/) and [webR](https://docs.r-wasm.org/webr/latest/)."
 

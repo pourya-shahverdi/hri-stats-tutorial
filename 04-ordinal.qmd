@@ -1,0 +1,272 @@
+---
+title: "4. When the outcome is a rating scale"
+subtitle: "Ordinal regression and ordinal mixed models"
+format:
+  live-html:
+    webr:
+      packages:
+        - ggplot2
+        - ordinal
+      cell-options:
+        autorun: true
+engine: knitr
+resources:
+  - data
+---
+
+{{< include ./_extensions/r-wasm/live/_knitr.qmd >}}
+
+::: {.callout-tip}
+## In this chapter you will learn to
+
+- recognize **ordinal** data, such as answers on an agreement scale
+- explain why a mean of rating-scale answers can mislead
+- understand the idea of a **hidden scale with cut-points**
+- fit and read an **ordinal regression** and an **ordinal mixed model**
+:::
+
+## A different kind of answer
+
+In the 5-session study, people also answered one statement after every session:
+
+> *"I would trust this robot to help me."*
+> 1 = Strongly disagree · 2 = Disagree · 3 = Neutral · 4 = Agree · 5 = Strongly agree
+
+```{webr}
+#| caption: Load and prepare the data
+#| edit: false
+library(ggplot2)
+library(ordinal)
+
+sessions <- read.csv("data/robot_sessions.csv")
+sessions$robot <- factor(sessions$robot, levels = c("neutral", "expressive"))
+sessions$time  <- sessions$session - 1
+
+answers <- c("Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree")
+sessions$agree_f <- factor(sessions$agree, levels = 1:5, labels = answers, ordered = TRUE)
+
+table(sessions$session, sessions$agree_f)
+```
+
+These answers are **ordinal**: they have a clear order, but we don't know the **distances** between them. Is the step from "Neutral" to "Agree" the same size as the step from "Agree" to "Strongly agree"? Nothing guarantees it.
+
+```{webr}
+#| caption: How people answered, session by session
+#| fig-height: 4
+ggplot(sessions, aes(factor(session), fill = agree_f)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ robot) +
+  scale_fill_brewer(palette = "RdBu") +
+  labs(x = "Session", y = "Share of answers", fill = "Answer") +
+  theme_minimal()
+```
+
+## Why not just average the numbers 1 to 5?
+
+You will often see means of rating-scale answers, and sometimes that's fine as a rough summary. But treating 1–5 as ordinary numbers has problems:
+
+- **Unequal steps:** a mean of 3.5 assumes every step between answers is the same size.
+- **Floors and ceilings:** nobody can answer 6. When many people pick the top answer, the mean gets squashed against the ceiling and the residuals stop looking normal.
+- **Impossible predictions:** a linear model can predict 5.6 or 0.4, which are not answers anyone can give.
+
+An **ordinal model** avoids all three. It only uses the fact that the answers are ordered.
+
+## The idea: a hidden scale cut into pieces
+
+Imagine that each person has a **hidden level of trust** on a smooth, continuous scale. The questionnaire can't see it directly. It only tells us which **slice** of that scale the person falls into. The boundaries between slices are called **cut-points** (or thresholds).
+
+An ordinal model estimates two things:
+
+1. **The cut-points**, which turn the hidden scale into answers.
+2. **How much each predictor shifts people along the hidden scale**, such as meeting the expressive robot or one more session.
+
+Move the slider to shift people's hidden trust and watch the answers change. The cut-points stay where they are.
+
+```{ojs}
+//| echo: false
+viewof shift = Inputs.range([-3, 3], {value: 0, step: 0.1, label: "Shift along the hidden scale"})
+```
+
+```{webr}
+#| caption: Hidden scale and answer probabilities
+#| input:
+#|   - shift
+#| runbutton: false
+#| startover: false
+#| fig-height: 3.8
+cuts <- c(-2, -0.7, 0.7, 2)
+cols <- c("#ca0020", "#f4a582", "#d9d9d9", "#92c5de", "#0571b0")
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+
+x <- seq(-7, 7, length.out = 500)
+plot(x, dlogis(x, location = shift), type = "n", ylim = c(0, 0.27),
+     xlab = "Hidden trust", ylab = "How common", main = "Hidden scale")
+edges <- c(-7, cuts, 7)
+for (k in 1:5) {
+  xs <- x[x >= edges[k] & x <= edges[k + 1]]
+  polygon(c(xs, rev(xs)), c(dlogis(xs, location = shift), rep(0, length(xs))),
+          col = cols[k], border = NA)
+}
+abline(v = cuts, lty = 2)
+
+probs <- diff(c(0, plogis(cuts - shift), 1))
+barplot(probs, names.arg = 1:5, col = cols, ylim = c(0, 0.8),
+        xlab = "Answer (1 = Strongly disagree)", ylab = "Probability", main = "Answers")
+```
+
+Shifting to the right makes the higher answers more likely and the lower ones less likely, all at once. One number, the shift, summarizes the change across every answer.
+
+## Ordinal regression: one answer per person
+
+Start simple: use **only the last session**, so each person gives one answer and the answers are independent. The function `clm()` (cumulative link model) from the `ordinal` package fits an ordinal regression:
+
+```{webr}
+#| caption: Ordinal regression on the last session
+last <- subset(sessions, session == 5)
+table(last$robot, last$agree_f)
+
+m_clm <- clm(agree_f ~ robot, data = last)
+summary(m_clm)
+```
+
+(Nobody chose "Strongly disagree" in session 5, so R estimates only three cut-points.)
+
+- **Threshold coefficients** are the cut-points on the hidden scale. You rarely need to interpret them.
+- **robotexpressive = 1.62 (p = .03):** meeting the expressive robot shifts people about 1.6 units higher on the hidden scale.
+
+That 1.62 is on the **log-odds** scale. Exponentiate it to get an **odds ratio**:
+
+```{webr}
+#| caption: Odds ratio
+exp(coef(m_clm)["robotexpressive"])
+```
+
+**How to say it:** *people who met the expressive robot had about 5 times the odds of giving a higher answer rather than a lower one.* This holds at every cut-point: "Agree or above" vs "Neutral or below", "Strongly agree" vs everything else, and so on. That is what the model assumes, and it is called the **proportional odds** assumption.
+
+Odds ratios are hard to picture, so it often helps to show the **predicted probability** of each answer:
+
+```{webr}
+#| caption: Predicted answers for each robot
+new <- data.frame(robot = factor(c("neutral", "expressive"), levels = c("neutral", "expressive")))
+pred <- predict(m_clm, newdata = new, type = "prob")$fit
+rownames(pred) <- c("neutral", "expressive")
+round(pred, 2)
+```
+
+The model predicts that "Strongly agree" is chosen by about 11% of people with the neutral robot and about 39% with the expressive robot.
+
+::: {.callout-warning}
+## A common mistake
+
+An odds ratio of 5 does **not** mean answers are 5 times higher, or that people are 5 times more likely to agree. It is a ratio of **odds** of being above a cut-point. When in doubt, report predicted probabilities as well.
+:::
+
+## Repeated answers: the ordinal mixed model
+
+Using only session 5 throws away the other four sessions. If we use all 150 answers, we're back to Chapter 2's problem: answers from the same person are related. The fix is the same as in Chapter 3, a **random intercept** for each person. The ordinal version of `lmer()` is `clmm()` (cumulative link **mixed** model):
+
+```{webr}
+#| caption: Ordinal mixed model, all sessions
+m_clmm <- clmm(agree_f ~ robot * time + (1 | participant_id), data = sessions)
+summary(m_clmm)
+```
+
+Read the coefficients just as in Chapter 3, but on the hidden scale:
+
+| Row | Estimate | What it means |
+|-----|----------|---------------|
+| `robotexpressive` | 0.38 (p = .70) | No clear difference between robots at the first session |
+| `time` | 0.65 (p < .001) | Neutral robot: answers move up across sessions |
+| `robotexpressive:time` | 0.63 (p = .009) | With the expressive robot, answers move up faster |
+
+The random effect (SD ≈ 2.2 on the hidden scale) says people differ a lot in how much they agree overall.
+
+So the ordinal model tells the same story as the linear mixed model in Chapter 3: the robots start similar, and trust grows faster with the expressive robot.
+
+To make it concrete, here is the predicted chance that a typical participant answers **"Agree" or "Strongly agree"** at each session:
+
+```{webr}
+#| caption: Chance of agreeing, typical participant
+#| fig-height: 4
+b    <- m_clmm$beta    # robot, time and interaction effects
+cuts <- m_clmm$alpha   # the four cut-points
+
+grid <- expand.grid(time = 0:4, robot = c("neutral", "expressive"))
+is_expr <- grid$robot == "expressive"
+grid$hidden <- b["robotexpressive"] * is_expr + b["time"] * grid$time +
+  b["robotexpressive:time"] * grid$time * is_expr
+grid$p_agree <- 1 - plogis(cuts["Neutral|Agree"] - grid$hidden)
+
+ggplot(grid, aes(time + 1, p_agree, colour = robot)) +
+  geom_line(linewidth = 1.5) + geom_point(size = 2) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(x = "Session", y = "Chance of Agree or Strongly agree", colour = "Robot") +
+  theme_minimal()
+```
+
+"Typical participant" means someone with an average random effect. Because people differ so much, individuals will be above or below these lines.
+
+## Which test should I use?
+
+| Your design | Your outcome | Use | R function |
+|-------------|--------------|-----|------------|
+| Different people in two groups, one measurement each | Numbers | t-test | `t.test()` |
+| The same people measured twice | Numbers | Paired t-test | `t.test(paired = TRUE)` |
+| The same people measured many times | Numbers | Linear mixed model | `lmer()` |
+| One answer per person | Ordered categories | Ordinal regression | `clm()` |
+| The same people answering many times | Ordered categories | Ordinal mixed model | `clmm()` |
+
+## Try it
+
+Fit an ordinal regression on the **first** session only. Do the robots differ at the start?
+
+```{webr}
+#| exercise: ex_clm
+#| autorun: false
+first <- subset(sessions, session == ______)
+m_first <- clm(agree_f ~ ______, data = first)
+summary(m_first)
+exp(coef(m_first)["robotexpressive"])
+```
+
+::: {.hint exercise="ex_clm"}
+The first session is session 1, and the predictor is the robot.
+:::
+
+::: {.solution exercise="ex_clm"}
+```r
+first <- subset(sessions, session == 1)
+m_first <- clm(agree_f ~ robot, data = first)
+```
+
+The estimate is close to 0 (odds ratio about 0.9, p = .89): no clear difference at the first session. That matches the mixed models, where the robots start out similar and pull apart over time.
+:::
+
+## Check your understanding
+
+::: {.callout-note collapse="true"}
+## Why is "Strongly disagree" to "Strongly agree" called ordinal?
+
+The answers have an order, but the distances between them are unknown.
+:::
+
+::: {.callout-note collapse="true"}
+## An odds ratio for a robot is 0.5. What does that mean?
+
+People who met that robot had about half the odds of giving a higher answer rather than a lower one. An odds ratio below 1 means lower answers are more likely.
+:::
+
+::: {.callout-note collapse="true"}
+## Why did we need `clmm()` instead of `clm()` for all five sessions?
+
+Each person gave five answers, and answers from the same person are related. `clmm()` adds a random effect for each person, just like `lmer()` does for numeric outcomes.
+:::
+
+## Key points
+
+- **Ordinal** answers have an order but unknown distances between them.
+- Ordinal models imagine a **hidden scale** cut into answers by **cut-points**. Predictors shift people along that scale.
+- Coefficients are **log-odds**; `exp()` turns them into **odds ratios**. Predicted probabilities are easier to explain.
+- With repeated answers from the same people, use an **ordinal mixed model** (`clmm()`) with a random effect for each person.
+
+**Coming next:** the same tools applied to a real study design, how trainees' feelings change during rehearsals with a robot.
